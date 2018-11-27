@@ -1,4 +1,4 @@
-package spy.random;
+package spy.g6;
 
 import java.util.List;
 import java.util.Collections;
@@ -19,11 +19,17 @@ public class Player implements spy.sim.Player {
     private ArrayList<ArrayList<Record>> records;
     private int id;
     private Point loc;
+    private HashMap<Integer,ArrayList<Record>> recordsToldBy;
+    private HashMap<Integer,ArrayList<Point>> pointsToldBy;
     
+
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
         this.id = id;
         this.records = new ArrayList<ArrayList<Record>>();
+        this.recordsToldBy = new HashMap<>();
+        this.pointsToldBy = new HashMap<>();
+        
         for (int i = 0; i < 100; i++)
         {
             ArrayList<Record> row = new ArrayList<Record>();
@@ -32,7 +38,10 @@ public class Player implements spy.sim.Player {
                 row.add(null);
             }
             this.records.add(row);
+
+
         }
+        // System.out.println(this.records);
     }
     
     public void observe(Point loc, HashMap<Point, CellStatus> statuses)
@@ -51,7 +60,9 @@ public class Player implements spy.sim.Player {
                 records.get(p.x).set(p.y, record);
             }
             record.getObservations().add(new Observation(this.id, Simulator.getElapsedT()));
+
         }
+        // System.out.println(records);
     }
     
     public List<Record> sendRecords(int id)
@@ -72,6 +83,47 @@ public class Player implements spy.sim.Player {
     
     public void receiveRecords(int id, List<Record> records)
     {
+
+
+        ArrayList<Record> receivedRecs = new ArrayList<Record>();
+        ArrayList<Point> receivedPoints = new ArrayList<Point>();
+
+        for (Record record : records)
+        {
+            //only add the record if not null
+            if (record != null)
+            {
+                receivedRecs.add(record);
+                receivedPoints.add(record.getLoc());
+
+
+            }
+        }
+
+        //keep track of records told by a specific player
+        if (recordsToldBy.containsKey(id)){
+            // concatenate receivedRecs
+            recordsToldBy.get(id).addAll(receivedRecs);
+        }else{
+            recordsToldBy.put(id,receivedRecs);
+
+        }
+
+        //keep track of all the points told by a specific player
+        if (pointsToldBy.containsKey(id)){
+            // concatenate receivedPoints
+            pointsToldBy.get(id).addAll(receivedPoints);
+        }else{
+            pointsToldBy.put(id,receivedPoints);
+
+        }
+
+
+        
+
+
+
+
         
     }
     
@@ -86,19 +138,24 @@ public class Player implements spy.sim.Player {
         {
             ArrayList<Integer> toReturn = new ArrayList<Integer>();
             toReturn.add(entry.getKey());
-            return toReturn;
+            // return entry.getKey();
+            return new ArrayList<Integer>(entry.getKey());
         }
         return null;
     }
+    
     public void receiveResults(HashMap<Integer, Integer> results)
     {
+
+
         
     }
     
     public Point getMove()
     {
         Random rand = new Random();
-        int x = rand.nextInt(2) * 2 - 1;
+        int x = rand.nextInt(2) * 2
+         - 1;
         int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
         return new Point(x, y);
     }

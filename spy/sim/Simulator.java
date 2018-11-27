@@ -409,7 +409,7 @@ public class Simulator {
                 }
                 if (!playerMoveIsValid(move))
                 {
-                    return;
+                    continue;
                 }
                 Point loc = playerLocations.get(i);
                 Point dest = new Point(loc.x + move.x, loc.y + move.y);

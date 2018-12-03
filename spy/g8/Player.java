@@ -47,6 +47,7 @@ public class Player implements spy.sim.Player {
     private boolean pathFound;
     private int step = 0;
     private int n;
+    private List<Point> path_to_package = null;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -617,12 +618,22 @@ public class Player implements spy.sim.Player {
 
 
             // move back and forth between package and target
-            List<Point> path = BFS_not_muddy(loc, pack);
-            if (path == null){
-                System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+            if (path_to_package == null){
+                path_to_package = new ArrayList<Point>();
+                path_to_package = BFS_not_muddy(loc, pack);
             }
-            path.remove(0);
-            Point toPackage = path.get(0);
+            
+            if (path_to_package.size() == 0){
+                path_to_package = null;
+            }
+            
+            if (path_to_package == null){
+                System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+                return new Point(0, 0);
+            }
+
+            path_to_package.remove(0);
+            Point toPackage = path_to_package.get(0);
             move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
             loc = new Point(toPackage.x, toPackage.y);
             System.out.println(this.id + " is moving to " + move.x + "," + move.y);

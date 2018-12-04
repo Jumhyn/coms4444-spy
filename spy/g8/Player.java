@@ -26,6 +26,7 @@ public class Player implements spy.sim.Player {
     private List<Point> waterCells;
     private List<Point> clear_muddy_cells;
     private List<Point> clearCells;
+    private List<Point> muddyCells;
     private List<Point> observed;
     private List<Point> notobserved;
     private List<Point> pTodPath;
@@ -49,6 +50,7 @@ public class Player implements spy.sim.Player {
     private int n;
     private List<Point> path_to_package = null;
     private HashMap<Point, HashMap<Integer, Integer>> receivedInfo;
+    private boolean isSpy = false;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -69,8 +71,10 @@ public class Player implements spy.sim.Player {
         this.rand = new Random();
         this.pTodPath = new ArrayList<Point>();
         this.currentPath = new ArrayList<Point>();
+        this.muddyCells = new ArrayList<Point>();
         this.n = n;
         this.receivedInfo = new HashMap<Point, HashMap<Integer, Integer>>();
+        this.isSpy = isSpy;
 
         this.waitTime = new HashMap<Integer,Integer>();
         for(int i=0;i<n;i++) {
@@ -162,7 +166,10 @@ public class Player implements spy.sim.Player {
 
             // record directly observed cells
             if (status.getC()!=1 && !waterCells.contains(p)) clearCells.add(p);
-            if (status.getC()==1 && !waterCells.contains(p)) clear_muddy_cells.remove(p);
+            if (status.getC()==1 && !waterCells.contains(p)) {
+                clear_muddy_cells.remove(p);
+                muddyCells.add(p);
+            }
             if (status.getPT()==1) pack = p;
             if (status.getPT()!=0 && status.getPT()!=1) dest = p;
 
@@ -180,19 +187,36 @@ public class Player implements spy.sim.Player {
     
     public List<Record> sendRecords(int id)
     {
-
-        ArrayList<Record> toSend = new ArrayList<Record>();
-        for (ArrayList<Record> row : records)
-        {
-            for (Record record : row)
+        if (isSpy == true){
+            ArrayList<Record> toSend = new ArrayList<Record>();
+            Collections.sort(muddyCells, pointComparator);
+            Point farthest_mud = muddyCells.get(muddyCells.size()-1);
+            Record muddy_record = new Record(farthest_mud, 0, 1, new ArrayList<Observation>());
+            int id_to_send;
+            if (this.id == 1)
+                id_to_send = 2;
+            else
+                id_to_send = 1;
+            muddy_record.getObservations().add(new Observation(id_to_send, Simulator.getElapsedT() - rand.nextInt(Simulator.getElapsedT())));
+            toSend.add(muddy_record);
+            System.out.println("******** SENT EVIL MUDDY RECORD **********");
+            System.out.println(toSend);
+            return toSend;
+        }
+        else{
+            ArrayList<Record> toSend = new ArrayList<Record>();
+            for (ArrayList<Record> row : records)
             {
-                if (record != null)
+                for (Record record : row)
                 {
-                    toSend.add(record);
+                    if (record != null)
+                    {
+                        toSend.add(record);
+                    }
                 }
             }
-        }
-        return toSend;
+            return toSend;
+        }        
     }
     
     public void receiveRecords(int id, List<Record> records)
@@ -306,8 +330,11 @@ public class Player implements spy.sim.Player {
     public List<Point> proposePath()
     {
         if (pack == null || dest == null) return null;
- 
-        return BFS(pack,dest);
+        
+        if (isSpy)
+            return BFS_Naive(pack, dest);
+        else
+            return BFS(pack, dest);
     }
 
     // BFS to take only non-muddy path
@@ -479,6 +506,9 @@ public class Player implements spy.sim.Player {
     
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        if (isSpy == true)
+            return null;
+
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
         {
             ArrayList<Integer> toReturn = new ArrayList<Integer>();
@@ -673,33 +703,39 @@ public class Player implements spy.sim.Player {
 
 
             // move back and forth between package and target
-            if (step > 50){            
+            if (step > 500){            
                 if (path_to_package == null){
                     path_to_package = new ArrayList<Point>();
                     path_to_package = BFS_not_muddy(loc, pack);
                     
+                    // lol somebody cheated us and so we could not find proper path. Alas we need to find pack and dest again :/
+                    if (path_to_package == null){
+                        pack = null;
+                        dest = null;
+                    }
                 }
                 else{
-                    Point destination = path_to_package.remove(0);
-                    return new Point(destination.x-loc.x,destination.y-loc.y);
-                }
-                
-                if (path_to_package.size() == 0){
-                    path_to_package = null;
-                }
-                
-                if (path_to_package == null){
-                    System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
-                    return new Point(0, 0);
-                }
 
- 
-                path_to_package.remove(0);
-                Point toPackage = path_to_package.get(0);
-                move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
-                loc = new Point(toPackage.x, toPackage.y);
-                System.out.println(this.id + " is moving to " + move.x + "," + move.y);
-                return move;
+                    // Point destination = path_to_package.remove(0);
+                    // return new Point(destination.x-loc.x,destination.y-loc.y);
+
+                    if (path_to_package.size() == 0){
+                        path_to_package = null;
+                    }
+                    
+                    if (path_to_package == null){
+                        System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+                        return new Point(0, 0);
+                    }
+
+     
+                    path_to_package.remove(0);
+                    Point toPackage = path_to_package.get(0);
+                    move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+                    loc = new Point(toPackage.x, toPackage.y);
+                    System.out.println(this.id + " is moving to " + move.x + "," + move.y);
+                    return move;
+                }
             }
 
 

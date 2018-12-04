@@ -153,7 +153,7 @@ public class Dijkstra {
        Vertex closestVertex = null;
 
        for (Vertex v: unknownVertices){
-         if (v.distance < minDistance){
+         if (v.distance <= minDistance){
            minDistance = v.distance;
            closestVertex = v;
          }

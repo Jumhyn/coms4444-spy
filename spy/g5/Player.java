@@ -43,6 +43,13 @@ public class Player implements spy.sim.Player
     // Keep Location of Target and Package
     private Point target_loc;
     private Point package_loc;
+    private Point possible_package;
+    private Point possible_target;
+
+    private int stuck_for;
+    private int voting_rounds;
+    private int proposing_rounds;
+    private List<Point> possible_path;
     
     // Movement functions
     private boolean sweep_complete = false;
@@ -55,6 +62,8 @@ public class Player implements spy.sim.Player
         this.time = t; // time out argument
         this.current = startingPos;// Current Position
         this.waterCells = waterCells; //Water, Can't pass them 
+	this.voting_rounds = 0;
+	this.stuck_for = 0;
         stay = false;
         if(isSpy)
         {
@@ -93,9 +102,24 @@ public class Player implements spy.sim.Player
         	}
         	// c = 2 is water, pt = 0, regular
         	truth_table.get(p.x).set(p.y, new Record(p, 2, 0, observations));
-        }
+        	records.get(p.x).set(p.y, new Record(p, 2, 0, observations));
+	}
     }
     
+    public boolean checkLoc(List<Integer> players, Point soilder, Point us){
+    	Integer player = players.get(0);
+		if(player>this.id){
+			return false;
+		}
+		else if (player==this.id){
+			return checkLoc(soilder,us);
+		}
+		else{
+			return true;
+		}
+	}
+
+
     public boolean checkLoc(Point soilder, Point us){
         if(soilder.y>us.y) return true;
         else if (soilder.y==us.y){
@@ -127,6 +151,7 @@ public class Player implements spy.sim.Player
     // Like do I really need to check if Package mismatched? Or Condition?
     public void observe(Point loc, HashMap<Point, CellStatus> statuses)
     {
+    	System.out.println("YO");
     	// Update current solider location
         current = loc;
         playerDetect = false;
@@ -145,6 +170,7 @@ public class Player implements spy.sim.Player
                 }
                 else{
                     flag = 0;
+                    break;
                 }
             }
 
@@ -154,7 +180,7 @@ public class Player implements spy.sim.Player
                 }
                 else{
                     playerDetect = true;
-                    if(checkLoc(p,loc)){
+                    if(checkLoc(players,p,current)){
                         stay = true;
                         moveToPlayer = false;
                         movePosition.x = p.x - current.x;
@@ -184,11 +210,13 @@ public class Player implements spy.sim.Player
             if(type == 1)
             {
                 package_loc = p;
+		possible_package = null;
             }
             // Target found
             else if(type == 2)
             {
             	target_loc = p;
+		possible_target = null;
             }
             // 0 just means not special tile...
             
@@ -199,6 +227,8 @@ public class Player implements spy.sim.Player
                 ArrayList<Observation> observations = new ArrayList<Observation>();
                 record = new Record(p, status.getC(), status.getPT(), observations);
                 truth_table.get(p.x).set(p.y, record);
+                Record record2 = new Record(p, status.getC(), status.getPT(), observations);
+		records.get(p.x).set(p.y, record2);
             }
             else
             {
@@ -289,10 +319,10 @@ public class Player implements spy.sim.Player
     
     // Place this in our Record Table, can contain lies!
     // Another idea is if we are sure one ID is a soy, we can just ignore...
-    public void receiveRecords(int id, List<Record> records)
+    public void receiveRecords(int id, List<Record> recs)
     {
     	// Who seriously is trying to send me a null pointer?
-    	if(records == null)
+    	if(recs == null)
     	{
     		return;
     	}
@@ -303,19 +333,31 @@ public class Player implements spy.sim.Player
     	}
     	else
     	{
-    		for(int i = 0; i < records.size(); i++)
+    		for(int i = 0; i < recs.size(); i++)
     		{
-    			Record r = records.get(i);
-                Point p = r.getLoc();
-                r.getObservations().add(new Observation (this.id, Simulator.getElapsedT()));
-                this.records.get(p.x).set(p.y, r);
-    			if(is_lying(r) == 1)
+		    Record r = recs.get(i);
+		    Point p = r.getLoc();
+		    r.getObservations().add(new Observation (this.id, Simulator.getElapsedT()));
+		    
+		    if(is_lying(r) == 1)
     			{
-    				// BLOCK EVERYTHING!
-    				// SPY IS FOUND!
-    				SPY_ID = id;
+			    // BLOCK EVERYTHING!
+			    // SPY IS FOUND!
+			    SPY_ID = id;
     			}
-    		}
+		    
+		    if(truth_table.get(p.x).get(p.y) == null){
+		       
+			this.records.get(p.x).set(p.y, r);
+			if(r.getPT() == 1 && package_loc == null){
+			    possible_package = p;
+			}
+			if(r.getPT() == 2 && target_loc == null){
+			    possible_target = p;
+			}
+		    }
+		    
+		}
     		
     		// Append to current observations? 
     		// Check contradicting claims?
@@ -351,19 +393,27 @@ public class Player implements spy.sim.Player
     // Gets a proposed path from a player at the package
     public List<Point> proposePath()
     {
+	proposing_rounds++;
+
 	if(target_loc == null || package_loc == null){
 	    return null;
 	}
-	
+	/*	if (proposing_rounds > 6){
+	    MazeSolver explore = new MazeSolver(current, target_loc, truth_table);
+	    explore.bushwhack();
+	    go_to = explore.path;
+	    proposing_rounds = 0;
+	    }	*/
 		MazeSolver solution = new MazeSolver(package_loc, target_loc, truth_table);
 		solution.solve();
-		//		System.out.print("proposing path: ");
-		//for(Point p :solution.path){
-		//  System.out.printf("(%d,%d), ", p.x, p.y);
-		    
-		//}
-		//System.out.println()
-
+		//	System.out.print("proposing path: ");
+		if(solution.path != null){
+		    //  for(Point p : solution.path){
+		    //	System.out.printf("(%d,%d), ", p.x, p.y);
+			
+		    //		    }
+		    // System.out.println();
+		}
 
        
     		// give wrong direction somehow...
@@ -382,7 +432,10 @@ public class Player implements spy.sim.Player
     {
     	// Initialize List of Player paths I will vote for
     	ArrayList<Integer> vote_for = new ArrayList<Integer>();
-    	for(int i = 0; i < n_players;i++)
+	List<List<Point>> valid_paths = new ArrayList<List<Point>>();
+	List<Integer> valid_players = new ArrayList<Integer>();
+	
+	for(int i = 0; i < n_players;i++)
     	{
     		List<Point> proposed_path = paths.get(i);
     		if(proposed_path == null)
@@ -393,20 +446,43 @@ public class Player implements spy.sim.Player
     		{
     			// Analyze the Path. For now, just compare with our truth table. 
     			// If a lie is found, Do NOT vote. Otherwise, vote for it!
-    			if(is_valid_path(proposed_path))
+		   	if(is_valid_path(proposed_path))
     			{
-			    if (vote_for.size() == 0){
-			    vote_for.add(i);
+			    if(vote_for.size() == 0){
+				vote_for.add(i);
 			    }
-    			}
+			    
+			    //valid_players.add(i);
+			}
+	    
     			else
-    			{
-    				// Who else but the spy would give me a bad path?
+			    {
+
+    				valid_paths.add(proposed_path);
+
+				// Who else but the spy would give me a bad path?
     				SPY_ID = i;
     			}
     		}
     	}
-        return vote_for;
+	if(valid_paths.size() > 0){
+	    possible_path = valid_paths.get(0);
+	} else {
+	    possible_path = new ArrayList<Point>();
+	    possible_path.add(new Point(0,0));
+	}
+	/*
+	int p = valid_players.get(0);
+       	for(int j=0; j<valid_paths.size(); j++){
+	    List<Point> path = valid_paths.get(j);
+	    if (path.size() < possible_path.size()){ //not necessarily the shortest path but an ok estimate
+		p = valid_players.get(j);
+		possible_path = path;
+	    }
+	}
+	vote_for.add(p);
+	*/
+	return vote_for;
     }
     
     private boolean is_valid_path(List<Point> path)
@@ -424,7 +500,7 @@ public class Player implements spy.sim.Player
         	if(verify == null)
         	{
         		// Sadly you can only just continue...
-        		continue;
+        		return false;
         	}
         	
     		if (i == 0)
@@ -459,12 +535,18 @@ public class Player implements spy.sim.Player
     // Recieves the results (in the event that no path succeeds).
     public void receiveResults(HashMap<Integer, Integer> results)
     {
-    	for(int i = 0; i < n_players; i++)
+	voting_rounds++;
+	if(voting_rounds > 3){
+	    go_to = possible_path;
+	    voting_rounds = 0;
+	}
+	
+	for(int i = 0; i < n_players; i++)
     	{
     		Integer num_votes = results.get(i);
     		if(num_votes != null)
-    		{
-		    //			System.out.println("G"+i+ " got " + num_votes + " votes");
+		    {
+			//		System.out.println("G"+i+ " got " + num_votes + " votes");
     		}
     	}
     }
@@ -473,6 +555,7 @@ public class Player implements spy.sim.Player
     // How much to shift to next location...
 	public Point getMove()
 	{
+	stuck_for--;
         for (int i=justMet.size()-1;i>=0;i--){
             int a = meetTime.get(i);
             a = a - 1 ;
@@ -513,7 +596,7 @@ public class Player implements spy.sim.Player
 		// TODO: modify this movement function so that it successfully navigates around water instead of getting stuck
 		if(target_loc != null && package_loc != null)
 		{
-		    //  System.out.printf("Package at %d, %d, target at %d, %d\n", package_loc.x, package_loc.y, target_loc.x, target_loc.y);
+		    // System.out.printf("Package at %d, %d, target at %d, %d\n", package_loc.x, package_loc.y, target_loc.x, target_loc.y);
 		    //			if(target_loc.x > current.x)
 		    //	{
 		    //		--x;
@@ -544,9 +627,11 @@ public class Player implements spy.sim.Player
 		    //	}
 		    MazeSolver moveToPackage = new MazeSolver(current, package_loc, truth_table);
 		    //		    System.out.printf("trying to move to %d, %d from %d, %d if we have a final path", package_loc.x, package_loc.y, current.x, current.y);
-		    moveToPackage.solve();
+		    moveToPackage.bushwhack();
 
 		    MazeSolver finalPath = new MazeSolver(package_loc, target_loc, truth_table);
+		    finalPath.solve();
+		    
 		    if(moveToPackage.path != null && finalPath != null){
 			go_to = moveToPackage.path;
 			//	System.out.println("set path to package");
@@ -554,10 +639,35 @@ public class Player implements spy.sim.Player
 		    }
 		    //System.out.println("no package path found\n");
 		}
-		else 
-		{
-			//System.out.printf("At point %d, %d\n", current.x, current.y);
 
+		/*    if(target_loc == null && possible_target != null){
+			
+			    MazeSolver exploreTarget = new MazeSolver(current, possible_target, records);
+			    exploreTarget.bushwhack();
+			    possible_target = null;
+			    if(exploreTarget.path != null){
+				go_to = exploreTarget.path;
+				
+				//System.out.println("exploring target");
+				return new Point(0,0);
+			    }
+			
+		    }
+		    
+		    if(package_loc == null && possible_package != null){
+			    MazeSolver exploreTarget = new MazeSolver(current, possible_package, records);
+			    exploreTarget.bushwhack();
+			    possible_package = null;
+			    if(exploreTarget.path != null){
+				go_to = exploreTarget.path;
+				
+				//System.out.println("exploring target");
+				return new Point(0,0);
+			    }
+			
+			    } */
+
+		    
 		    //System.out.println("Target FOUND");
 		    int possible_y = current.y;
 		    int possible_x = current.x;
@@ -593,6 +703,26 @@ public class Player implements spy.sim.Player
 			    possible_x--;
 			    if (truth_table.get(possible_x).get(current.y) == null)
 				{
+				    List<Point> new_path = new ArrayList<Point>();
+				    if(truth_table.get(current.x-1).get(current.y).getC() == 0){				    
+					if(truth_table.get(current.x-2).get(current.y).getC() == 0){
+					    new_path.add(new Point(current.x-2,current.y));
+
+					    if(truth_table.get(current.x-3).get(current.y).getC() == 0){
+						new_path.add(new Point(current.x-3,current.y));
+						if(truth_table.get(current.x-4).get(current.y) == null || truth_table.get(current.x-4).get(current.y).getC() == 0) {
+						    new_path.add(new Point(current.x-4,current.y));
+
+						}
+					    }
+					}
+				    }
+
+				    if (new_path.size() > 0){
+					go_to = new_path;
+					//System.out.print("stepping left");
+				    }
+				    
 				    return new Point(-1, 0);
 				}
 			}
@@ -604,13 +734,28 @@ public class Player implements spy.sim.Player
 		    }
 		    List<Point> epath = sweeper.explore(current, truth_table);
 		    if (epath != null) {
+			//System.out.println("epath\n\n\n\n\n\n\n");
 			go_to = epath;
 			return new Point(0, 0);
 		    }
 		    
-		}
-		//		System.out.printf("stuck at %d, %d\n", current.x, current.y);
-		return new Point(0,0);
+		
+		    /*		    //System.out.printf("stuck at %d, %d\n", current.x, current.y);
+		stuck_for+=2;
+		if(stuck_for > 6){
+		    stuck_for = 0;
+		    if(target_loc != null){
+			MazeSolver helpme = new MazeSolver(current, target_loc, truth_table);
+			helpme.bushwhack();
+			go_to = helpme.path;
+		    } /*else if(target_loc != null){
+			MazeSolver helpme = new MazeSolver(current, target_loc, truth_table);
+			helpme.bushwhack();
+			go_to = helpme.path;
+			}*/
+		    
+		
+	       return new Point(0,0);
 	}
 	
 	private ArrayList<Point> all_valid_moves(Point current)

@@ -59,6 +59,7 @@ public class Player implements spy.sim.Player {
         for (int i=0; i<99; i++){
             for (int j=0; j<99; j++){
                 viewed[i][j] = false;
+                graph[i][j] = -1;
             }
         }
 
@@ -131,7 +132,10 @@ public class Player implements spy.sim.Player {
                         if (i == this.id){
                             continue;
                         }
-                        else if (i > this.id){
+                        if (Met.get(i)>0){
+                            continue;
+                        }
+                        if (i > this.id){
                             // wait for five turns for it to get here
                             todo.add(0,new Point(0,0));
                             todo.add(0,new Point(0,0));
@@ -140,10 +144,9 @@ public class Player implements spy.sim.Player {
                             todo.add(0,new Point(0,0));
                         }
                         else{
-                            if (Met.get(i) == 0){
-                                move_toward(p);
-                                break;
-                            }
+                            System.out.printf("%d moving toward %d",this.id, i);
+                            move_toward(p);
+                            break;
                         }
                     }
                 }
@@ -154,6 +157,9 @@ public class Player implements spy.sim.Player {
     
     public List<Record> sendRecords(int id)
     {
+        if (Met.get(id) > 0){
+            return new ArrayList<Record>();
+        }
         ArrayList<Record> toSend = new ArrayList<Record>();
         for (ArrayList<Record> row : records)
         {
@@ -245,19 +251,9 @@ public class Player implements spy.sim.Player {
         System.out.printf("remaining cells: %d \n", ct);
         
         */
-        for (Integer i: Met.keySet()){
-            if (Met.get(i) > 0){
-                Met.put(i, Met.get(i)-1);
-            }
-        }
         
         if (todo.size() > 0){
             return move_to(todo.remove(todo.size()-1));
-        }
-
-        if (loc.x == 2 && loc.y == 2){
-            System.out.println(target_found);
-            System.out.println(package_found);
         }
 
         if (package_found && target_found){
@@ -265,8 +261,8 @@ public class Player implements spy.sim.Player {
                 System.out.printf("%d is waiting \n",id);
                 return new Point(0,0);
             }
-            else if (find_path(package_loc, target_loc) != null){
-                path = find_path(package_loc,target_loc);
+            else if (dfs(package_loc, target_loc) != null){
+                path = dfs(package_loc,target_loc);
                 path_found = true;
                 move_toward(package_loc);
                 System.out.printf("%d moving towards package at %d %d\n",id,package_loc.x,package_loc.y);
@@ -514,5 +510,86 @@ public class Player implements spy.sim.Player {
         }
         dst += 2*(dx+dy);
         return dst;
+    }
+
+    private List<Point> dfs(Point s, Point t) {
+        // List<List<Integer>> record = new ArrayList<List<Integer>>();
+        // for (int i = 0; i < 100; i++) {
+        //     List<Integer> list = new ArrayList<Integer>(Collections.nCopies(100, 0));
+        //     record.add(list);
+        // }
+        Map<Point, Integer> dist = new HashMap<Point, Integer>();
+        PriorityQueue<Pair> queue = new PriorityQueue<Pair>();
+        Map<Point, Point> prev = new HashMap<Point, Point>();
+        boolean[][] v = new boolean[100][100];
+        List<Point> proposal = new ArrayList<Point>();
+
+        for (int i = 0; i < 100; i++) {
+            for (int j = 0; j < 100; j++) {
+                Point p = new Point(i, j);
+                dist.put(p, Integer.MAX_VALUE);
+                // prev.put(p, null);
+            }
+        }
+
+        dist.put(s, 0);
+        queue.add(new Pair(s, 0));
+        Pair pair = queue.poll();
+        Point next = pair.pt;
+        v[next.x][next.y] = true;
+        // System.out.println("preprocessing done, starting point: x = " + next.x + ", y = " + next.y);
+        while (!next.equals(t)) {
+            // System.out.println("next: x = " + next.x + ", y = " + next.y);
+            for (int i = next.x - 1; i < next.x + 2; i++) {
+                for (int j = next.y - 1; j < next.y + 2; j++) {
+                    Point candidate = new Point(i, j);
+                    // System.out.println("candidate: x = " + i + ", y = " + j);
+                    if (i < 0 || i > 99 || j < 0 || j > 99 || v[i][j] || water.contains(candidate) || records.get(i).get(j) == null || records.get(i).get(j).getC() == 1 /*|| record.get(i).get(j) != 0*/) {
+                        continue;
+                    }
+                    // double distance = Math.abs(next.x - i) + Math.abs(next.y - j);
+                    int distance = dist(next, candidate);
+                    // System.out.println("valid candidate: x = " + i + ", y = " + j + ", distance: " + distance);
+                    if (dist.get(next) + distance < dist.get(candidate)) {
+                        dist.put(candidate, dist.get(next) + distance);
+                        prev.put(candidate, next);
+                        queue.add(new Pair(candidate, dist.get(next) + distance));
+                    }
+                }
+            }
+
+            if (queue.size() == 0) {
+                break;
+            }
+
+            pair = queue.poll();
+            next = pair.pt;
+            v[next.x][next.y] = true;
+        }
+
+        System.out.println("while loop ended");
+
+        if (!prev.containsKey(t)) {
+            return null;
+        }
+
+        Point p = t;
+        proposal.add(p);
+        System.out.println("shortest path, point: x = " + p.x + ", y = " + p.y);
+        while (prev.containsKey(p)) {
+            p = prev.get(p);
+            proposal.add(p);
+            System.out.println("shortest path, point: x = " + p.x + ", y = " + p.y);
+        }
+
+        if (proposal.get(0).equals(target_loc)) {
+            Collections.reverse(proposal);
+        }
+
+        if (proposal.size() == 0) {
+            return null;
+        }
+
+        return proposal;
     }
 }

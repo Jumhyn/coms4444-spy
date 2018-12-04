@@ -26,6 +26,7 @@ public class Player implements spy.sim.Player {
     private HashMap<Point, List<Record>> trustRecords;
     private HashMap<Point, List<Record>> tempRecords;
     private Point package_loc;
+    private int overallStrategy = 0;
     private Point target_loc;
     private boolean package_found;
     private boolean target_found;
@@ -44,6 +45,10 @@ public class Player implements spy.sim.Player {
     private boolean communicating = false;
     private boolean sentRecord = false;
     private boolean receiveRecord = false;
+    // 0 means the player explores diagonally, 1 means they explore horizontal
+    private int explorationStrategy = 1;
+    private int explorationDirection;
+    private int offsetStatus = 0;
     private int step = 1;
     private int sendstep = 1;
     class PathTime{
@@ -86,6 +91,17 @@ public class Player implements spy.sim.Player {
         this.mudCells = new ArrayList<Point>();
         trust.add(id);
         this.id = id;
+        double randNum = Math.random();
+        if (randNum < 0.5) {
+            this.explorationStrategy = 0;
+        }
+        else {
+            this.explorationStrategy = 1;
+        }
+        Random random = new Random();
+        explorationDirection = random.nextInt(4)+4;
+        System.out.println("Exploration direction: ");
+        System.out.println(explorationDirection);
         this.records = new ArrayList<ArrayList<Record>>();
 
         for (int i = 0; i < 100; i++)
@@ -469,6 +485,7 @@ public class Player implements spy.sim.Player {
 
 
         List<Point> path= proposePath();
+
         // System.out.println("printing current location: " + loc.x + "," + loc.y);      
         List<Point> neighbors = getSurrounding(loc);
         for(Point n:neighbors) {
@@ -487,12 +504,170 @@ public class Player implements spy.sim.Player {
         // System.out.println("notobserved size: " + notobserved.size());
 
         if(notobserved.size() > 0) {
-            Collections.sort(notobserved, pointComparator);
-            destination = notobserved.get(0);
-            // System.out.println("DEST:"+destination.x + " " + destination.y);
-            if(destination.x > loc.x) { 
+            // if we're currently moving over by 3
+            if (this.offsetStatus > 0 && this.offsetStatus < 3){
+                System.out.println("in the midst of an offset traversal");
+                if (this.explorationDirection == 5 || this.explorationDirection == 8) {
+                    move = new Point(0,1);
+                }
+                else if (this.explorationDirection == 6 || this.explorationDirection == 7) {
+                    move = new Point(0, 1);
+                }
+                this.offsetStatus += 1;
+                return move;
+            }
+            else {
+
+                // we've reached the end of the offset traversal, go in the opposite direction now
+                if (this.offsetStatus == 3) {
+                    if (this.explorationStrategy == 0) {
+                        getOppositeDiagonalDirection();
+                        this.offsetStatus = 0;
+                    }
+                    else {
+                        getOppositeOrthogonalDirection();
+                        this.offsetStatus = 0;
+                    }
+                }
+                // go diagonal
+                if (this.explorationStrategy == 0) {
+                    if (this.explorationDirection == 8) {
+                        move = new Point(-1,-1);
+                    }
+                    else if (this.explorationDirection == 7){
+                        move = new Point(1, -1);
+                    }
+                    else if (this.explorationDirection == 6) {
+                        move = new Point(1, 1);
+                    }
+                    else {
+                        move = new Point(-1, 1);
+                    }
+                    loc = new Point(loc.x + move.x, loc.y + move.y);
+                    // check to see if the place we're going is a water cell
+                    if (this.waterCells.contains(loc)) {
+                        // offset by 3 and keep going
+                        this.offsetStatus = 1;
+                        if (this.explorationDirection == 5 || this.explorationDirection == 8) {
+                            move = new Point(0,-1);
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(0,1);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(1,0);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(-1,0);
+                            }
+                        }
+                        else if (this.explorationDirection == 6 || this.explorationDirection == 7) {
+                            move = new Point(0, 1);
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(0,-1);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(1,0);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(-1,0);
+                            }
+                        }
+                    }
+                    // if we hit the edge, we want to move 3 away and go in the opposite direction
+                    if (loc.x >= 100 || loc.y >= 100 || loc.x == 0 || loc.y == 0) {
+                        this.offsetStatus = 1;
+                        // hit the far right wall
+                        if (loc.x >= 100 && this.explorationDirection == 5) {
+                            // go up
+                            move = new Point(0, -1);
+                        }
+                        else if (loc.x >=100 && this.explorationDirection == 6) {
+                            move = new Point(0, 1);
+                        }
+                        else if (loc.x == 0 && this.explorationDirection == 7) {
+                            move = new Point(0, -1);
+                        }
+                        else if (loc.x == 0 && this.explorationDirection == 8) {
+                            move = new Point(0, 1);
+                        }
+                        else if (loc.y >= 100 && this.explorationDirection == 6) {
+                            move = new Point(-1,0);
+                        }
+                        else if (loc.y >= 100 && this.explorationDirection == 7) {
+                            move = new Point(1,0);
+                        }
+                        else if (loc.y == 0 && this.explorationDirection == 8) {
+                            move = new Point(-1,0);
+                        }
+                        else {
+                            move = new Point(1, 0);
+                        }
+                    }
+                }
+                // if we're going horizontal/vertical
+                else {
+                    System.out.println("Going vertical");
+                    if (this.explorationDirection == 1) {
+                        move = new Point(0,-1);
+                    }
+                    else if (this.explorationDirection == 2){
+                        move = new Point(1, 0);
+                    }
+                    else if (this.explorationDirection == 3) {
+                        move = new Point(0, 1);
+                    }
+                    else {
+                        move = new Point(-1, 0);
+                    }
+                    loc = new Point(loc.x + move.x, loc.y + move.y);
+                    // check to see if the place we're going is a water cell
+                    if (this.waterCells.contains(loc)) {
+                        // offset by 3 and keep going
+                        this.offsetStatus = 1;
+                        if (this.explorationDirection == 2 || this.explorationDirection == 4) {
+                            move = new Point(0,1);
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(0,-1);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(1,0);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(-1,0);
+                            }
+                        }
+                        else if (this.explorationDirection == 1 || this.explorationDirection == 3) {
+                            move = new Point(0, -1);
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(0,1);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(1,0);
+                            }
+                            if (this.waterCells.contains(move)) {
+                                move = new Point(-1,0);
+                            }
+                        }
+                    }
+                    // if we hit the edge, we want to move 3 away and go in the opposite direction
+                    if (loc.x >= 100 || loc.y >= 100 || loc.x == 0 || loc.y == 0) {
+                        this.offsetStatus = 1;
+                        if (this.explorationDirection == 1 || this.explorationDirection == 3) {
+                            move = new Point(0,-1);
+                        }
+                        else if (this.explorationDirection == 2 || this.explorationDirection == 4) {
+                            move = new Point(0, 1);
+                        }
+
+                    }
+
+                }
+                /*Collections.sort(notobserved, pointComparator);
+                  destination = notobserved.get(0);
+                // System.out.println("DEST:"+destination.x + " " + destination.y);
+                if(destination.x > loc.x) { 
                 move = new Point(1,0);
-            } else if (destination.x < loc.x) {
+                } else if (destination.x < loc.x) {
                 move = new Point(-1,0);
             } else {
                 if (destination.y > loc.y) {
@@ -500,102 +675,77 @@ public class Player implements spy.sim.Player {
                 } else {
                     move = new Point(0,-1);
                 } 
+            }*/
             }
-        }
-        else {
-            Random rand = new Random();
-            int x = rand.nextInt(2) * 2 - 1;
-            int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
-            move = new Point(x, y);
-        }
 
-        loc = new Point(loc.x + move.x, loc.y + move.y);
-        if (waterCells.contains(loc)) {
-            Random rand = new Random();
-            int x = rand.nextInt(2) * 2 - 1;
-            int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
-            move = new Point(x, y);
             loc = new Point(loc.x + move.x, loc.y + move.y);
-        }
 
-        if (package_found && target_found) {
+            if (package_found && target_found) {
             // move towards package
-            if (package_loc.x > loc.x && package_loc.y > loc.y) {
-                move = new Point(1,1);
-            } else if (package_loc.x < loc.x && package_loc.y < loc.y) {
-                move = new Point(-1,-1);
-            } else if (package_loc.x > loc.x && package_loc.y < loc.y) {
-                move = new Point(1, -1);
-            } else if (package_loc.x < loc.x && package_loc.y > loc.y) {
-                move = new Point(-1, 1);
-            } else if (package_loc.x > loc.x) {
-                move = new Point(1,0);
-            } else if (package_loc.y > loc.y) {
-                move = new Point(1,0);
-            }
-            loc = new Point(loc.x + move.x, loc.y + move.y);
-        }
-
-        else if (package_found || target_found) {
-            // System.out.println("something found");
-            // only move to non-muddy cells
-            while (mudCells.contains(loc)) {
-                Random rand = new Random();
-                int x = rand.nextInt(2) * 2 - 1;
-                int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
-                move = new Point(x, y);
+                if (package_loc.x > loc.x && package_loc.y > loc.y) {
+                    move = new Point(1,1);
+                } else if (package_loc.x < loc.x && package_loc.y < loc.y) {
+                    move = new Point(-1,-1);
+                } else if (package_loc.x > loc.x && package_loc.y < loc.y) {
+                    move = new Point(1, -1);
+                } else if (package_loc.x < loc.x && package_loc.y > loc.y) {
+                    move = new Point(-1, 1);
+                } else if (package_loc.x > loc.x) {
+                    move = new Point(1,0);
+                } else if (package_loc.y > loc.y) {
+                    move = new Point(1,0);
+                }
                 loc = new Point(loc.x + move.x, loc.y + move.y);
             }
-        } 
+
+            else if (package_found || target_found) {
+                // System.out.println("something found");
+                // only move to non-muddy cells
+                while (mudCells.contains(loc)) {
+                    Random rand = new Random();
+                    int x = rand.nextInt(2) * 2 - 1;
+                    int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
+                    move = new Point(x, y);
+                    loc = new Point(loc.x + move.x, loc.y + move.y);
+                }
+            } 
+        }
         
         //System.out.println("NEW LOC:"+loc.x + " " + loc.y);
         return move;
     }
-    /*
-
-    public Point getMove() {
-        // if not waterCells
-        // System.out.println("printing recordss from records");
-        // for (ArrayList<Record> r: this.records) {
-        //     for (Record each : r) {
-        //         System.out.println(each);
-        //     }
-        // }
-
-        // System.out.println("printing records from trustRecords");
-        // for (Point p : trustRecords.keySet() ) {
-        //     System.out.println(p.x + "," + p.y);
-        //     System.out.println(trustRecords.get(p));
-        // }
-
-        System.out.println("printing current location: " + loc.x + "," + loc.y);
-        Random rand = new Random();
-        int x = rand.nextInt(2) * 2 - 1;
-        int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
-        Point location = new Point(loc.x + x, loc.y + y);
-        System.out.println("printing new location: " + location.x + "," + location.y);
-        System.out.println("testing trust records: " + trustRecords.get(location));
-
-        // if target or package found, only move to clear spaces
-        
-        
-        // we want to move to a point if it's not already in trusted records
-        // while (trustRecords.get(location) != null) {
-        //     System.out.println("in condition loop");
-        //     if (trustRecords.get(location.x + 3) == null) {
-        //         location = new Point(loc.x + 1, loc.y);
-        //         return location;
-        //     }
-        //     else if (trustRecords.get(location.y + 3) == null) {
-        //         location = new Point(loc.x, loc.y + 1);
-        //         return location;
-        //     }
-        //     else break;
-        // }
-        return location;
+    private void getOppositeDiagonalDirection() {
+        if (this.explorationDirection == 5) {
+            this.explorationDirection = 7;
+        }
+        else if (this.explorationDirection == 6) {
+            this.explorationDirection = 8;
+        }
+        else if (this.explorationDirection == 7) {
+            this.explorationDirection = 5;
+        }
+        else {
+            this.explorationDirection = 6;
+        }
 
     }
-    */
-    
+
+    private void getOppositeOrthogonalDirection() {
+        if (this.explorationDirection == 1) {
+            this.explorationDirection = 3;
+        }
+        else if (this.explorationDirection == 2) {
+            this.explorationDirection = 4;
+        }
+        else if (this.explorationDirection == 3) {
+            this.explorationDirection = 1;
+        }
+        else {
+            this.explorationDirection = 2;
+        }
+        
+    }
+
 
 }
+

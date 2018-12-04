@@ -43,7 +43,7 @@ public class Player implements spy.sim.Player {
     private Boolean _package; //whether package has been located
     private Point package_Location; // package location
     private Point target_Location; // target location
-    private int[][] grid; // status of cells: -2 id water, -1 is muddy, 0 is normal, 1 is target & Package
+    private int[][] grid; // status of cells: -2 is water, -1 is muddy, 0 is normal, 1 is target & Package
     private int[][] visited; // whether the cell has been visited
     private int[][] explored; // whether the cell has been explored i.e. neighbors searched, in the current iteration
     private List<Point> proposedPath; // proposed safe path from package to target
@@ -65,13 +65,27 @@ public class Player implements spy.sim.Player {
     private int minGraceTime = 25; // Minimum count needed to allow communication protocol
     private Boolean send_rec;
 
+    // Handle Information Fusion
+    // Each cell has a corresponding list of records which respecitve dry/muddy claims
+    // To access a list of records of position (x, y)
+    // Simply Index into the desired records with dryRecords.get(x).get(y)
+    // This returns a list of records for that cell
+ 	private ArrayList<ArrayList<ArrayList<Record>>> dryRecords;
+    private ArrayList<ArrayList<ArrayList<Record>>> mudRecords; 
+    private double[][] dryConfidence;
+    private double[][] mudConfidence;
+
+
+    // Handles Spy Detection
+    private ArrayList<Integer> suspects;
+
+
+    // Handles Spy Implementation
+
     private int sendCount = 0;
     private int recCount = 0;
      
     private ArrayList<Point> wayPoints;
-
-    private ArrayList<ArrayList<Record>> landInfo; // similar to 'records' but global for dry land claims
-    private ArrayList<ArrayList<Record>> mudInfo; // similar to 'records' but global for muddy land claims
     
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -82,6 +96,8 @@ public class Player implements spy.sim.Player {
         this.grid = new int[100][100];
         this.visited = new int[100][100];
         this.explored = new int[100][100];
+        this.dryConfidence = new double[100][100];
+        this.mudConfidence = new double[100][100];
         this.package_Location = new Point(-1,-1);
         this.target_Location = new Point(-1,-1);
         this.proposedPath = new ArrayList<Point>();
@@ -90,10 +106,21 @@ public class Player implements spy.sim.Player {
         this.unexplored = getRandomUnexplored();
 
         this.wayPoints = new ArrayList<Point>();
+        this.suspects = new ArrayList<Integer>();
 
         // Keep reference of recent obeservation (referenced during getMove call)
         this.lastObservation = new HashMap<Point, CellStatus>();
         this.send_rec = false;
+
+        // Communcation Fusion Initialization
+        // this.landRecords = new int[100][100];
+        for (int i=0; i < 100; i++) 
+       	{
+       		for (int j=0; j<100; j++)
+       		{
+       			int temp = 1;
+       		}
+       	}
 
         // Initialize notSeenCount to minGraceTime to initially allow communication with any player
         this.notSeenCount = new HashMap<Integer, Integer>();
@@ -108,6 +135,8 @@ public class Player implements spy.sim.Player {
             {
                 grid[i][j] = -1;
                 visited[i][j] = 0;
+                dryConfidence[i][j] = 0;
+                mudConfidence[i][j] = 0;
             }
         }
 
@@ -130,6 +159,26 @@ public class Player implements spy.sim.Player {
             }
         // System.out.println(row);
             this.records.add(row);
+        }
+
+        // Initialize dry/mud records 
+        this.dryRecords = new ArrayList<ArrayList<ArrayList<Record>>>();
+        this.mudRecords = new ArrayList<ArrayList<ArrayList<Record>>>();
+
+        for (int i = 0; i < 100; i++)
+        {
+            ArrayList<ArrayList<Record>> dryRow = new ArrayList<ArrayList<Record>>();
+            ArrayList<ArrayList<Record>> mudRow = new ArrayList<ArrayList<Record>>();
+            for (int j = 0; j < 100; j++)
+            {
+                ArrayList<Record> dryColumn = new ArrayList<Record>();
+                ArrayList<Record> mudColumn = new ArrayList<Record>();
+
+                dryRow.add(dryColumn);
+                mudRow.add(mudColumn);
+            }
+            this.dryRecords.add(dryRow);
+            this.mudRecords.add(mudRow);
         }
     }
     
@@ -236,15 +285,38 @@ public class Player implements spy.sim.Player {
             Point p = new_record.getLoc();
             Record curr_record = this.records.get(p.x).get(p.y);
 
+            // Flag when new respective record has been added
+            // Use this to detect cases where we had all dry records
+            // Then suddenly one record claimed muddy
+            // This way we can narrow down who is the spy based on this new record
+            boolean dryAdded = false;
+            boolean mudAdded = false;
+
             visited[p.x][p.y] = 1;  // to be changed in case of spy
 
             if(new_record.getC()==0)
             {
-                grid[p.x][p.y] = 0;    
+                grid[p.x][p.y] = 0;
+
+                ArrayList<Record> dryClaims = dryRecords.get(p.x).get(p.y);  
+
+                // Add only new records to claim list
+                if (!dryClaims.contains(new_record)) {
+                	dryClaims.add(new_record);
+                	dryAdded = true;
+                }
             }
             else if(new_record.getC()==1)
             {
                 grid[p.x][p.y] = -1;
+
+                ArrayList<Record> mudClaims = mudRecords.get(p.x).get(p.y);  
+
+                // Add only new records to claim list
+                if (!mudClaims.contains(new_record)) {
+                	mudClaims.add(new_record);
+                	mudAdded = true;
+                }
             }
 
             if(new_record.getPT()==1)
@@ -271,6 +343,28 @@ public class Player implements spy.sim.Player {
 
             else
             curr_record.getObservations().add(new Observation(this.id, Simulator.getElapsedT()));
+
+
+        	// Compute new confidence given this new record
+        	// Get confidence by doing mudC
+        	// Note: May want to refer to our personal records to tell when a blatant lie is told
+        	// Eg. We personally saw (x, y) is dry but a record says muddy
+        	ArrayList<Record> dryClaims = dryRecords.get(p.x).get(p.y);
+        	ArrayList<Record> mudClaims = mudRecords.get(p.x).get(p.y);
+
+        	// The case where only one record exists with a claim for the cell
+        	// IMPORTANT: Never update a cell status if we've personally seen it's status
+        	if (dryClaims.size() == 0 && mudClaims.size() == 1) {
+
+        	} else if (dryClaims.size() == 1 && mudClaims.size() == 0) {
+
+        	}
+
+        	// The case where only one record exists for each status (dry or muddy)
+        	// IMPORTANT: Never update a cell status if we've personally seen it's status
+        	if (dryClaims.size() == 1 && mudClaims.size() == 1) {
+
+        	}
 
         }
 

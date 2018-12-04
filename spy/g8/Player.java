@@ -48,6 +48,7 @@ public class Player implements spy.sim.Player {
     private int step = 0;
     private int n;
     private List<Point> path_to_package = null;
+    private HashMap<Point, HashMap<Integer, Integer>> receivedInfo;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -69,6 +70,7 @@ public class Player implements spy.sim.Player {
         this.pTodPath = new ArrayList<Point>();
         this.currentPath = new ArrayList<Point>();
         this.n = n;
+        this.receivedInfo = new HashMap<Point, HashMap<Integer, Integer>>();
 
         this.waitTime = new HashMap<Integer,Integer>();
         for(int i=0;i<n;i++) {
@@ -205,37 +207,89 @@ public class Player implements spy.sim.Player {
         updateRecords();
     }
 
+    // public void updateRecords(){
+    //     for(int id:receivedRecords.keySet()){
+    //         List<Record> rec = receivedRecords.get(id);
+    //         for (Record r: rec){
+    //             if(!waterCells.contains(r.getLoc()) && r.getC() != 1 && notobserved.contains(r.getLoc())){
+
+    //                 clearCells.add(r.getLoc());
+    //                 keepUnique(clearCells);
+
+    //                 // trust the other agent
+    //                 observed.add(r.getLoc());
+    //                 keepUnique(observed);
+
+    //                 notobserved.remove(r.getLoc());
+    //                 keepUnique(notobserved);
+    //             }
+
+    //             // if the cell is muddy
+    //             if(!waterCells.contains(r.getLoc()) && r.getC() == 1 && notobserved.contains(r.getLoc())){
+    //                 clear_muddy_cells.add(r.getLoc());
+    //                 keepUnique(clear_muddy_cells);
+    //             }
+
+    //             // if they pass us target
+    //             if (dest == null && r.getPT() != 0 && r.getPT() != 1){
+    //                 dest = r.getLoc();
+    //             }
+
+    //             // if they pass us pakckage
+    //             if (pack == null && r.getPT() == 1){
+    //                 pack = r.getLoc();
+    //             }
+    //         }
+    //     }
+    // }
+
     public void updateRecords(){
         for(int id:receivedRecords.keySet()){
             List<Record> rec = receivedRecords.get(id);
             for (Record r: rec){
-                if(!waterCells.contains(r.getLoc()) && r.getC() != 1 && notobserved.contains(r.getLoc())){
+                Point p = r.getLoc();
+                if (!notobserved.contains(p) || waterCells.contains(p)) continue;
+                List<Observation> observe= r.getObservations();
+                int player_id = observe.get(observe.size()-1).getID();
 
-                    clearCells.add(r.getLoc());
-                    keepUnique(clearCells);
+                // package = 1, target = 2, muddy = 3, clear = 4 
+                Integer status;
+                if (r.getPT() == 1){status = new Integer(1);}
+                else if (r.getPT() != 0){status = new Integer(2);}
+                else if (r.getC()==1){status = new Integer(3);}
+                else{status = new Integer(4);}
 
-                    // trust the other agent
-                    observed.add(r.getLoc());
-                    keepUnique(observed);
-
-                    notobserved.remove(r.getLoc());
-                    keepUnique(notobserved);
+                if(!receivedInfo.containsKey(p)){
+                    HashMap<Integer,Integer> record = new HashMap<>();
+                    record.put(status,player_id);
+                    receivedInfo.put(p,record);
                 }
-
-                // if the cell is muddy
-                if(!waterCells.contains(r.getLoc()) && r.getC() == 1 && notobserved.contains(r.getLoc())){
-                    clear_muddy_cells.add(r.getLoc());
-                    keepUnique(clear_muddy_cells);
-                }
-
-                // if they pass us target
-                if (dest == null && r.getPT() != 0 && r.getPT() != 1){
-                    dest = r.getLoc();
-                }
-
-                // if they pass us pakckage
-                if (pack == null && r.getPT() == 1){
-                    pack = r.getLoc();
+                else{
+                    HashMap<Integer,Integer> record = receivedInfo.get(p);
+                    if (record.containsKey(status)){
+                        if(record.get(status)!=player_id){
+                            //System.out.println("Trusting Player "+player_id);
+                            observed.add(p);
+                            notobserved.remove(p);
+                            if(status==1){
+                                pack = p;
+                                clearCells.add(p);
+                            }
+                            else if (status==2){
+                                dest = p;
+                                clearCells.add(p);
+                            }
+                            else if (status==3){
+                                clear_muddy_cells.add(p);
+                            }
+                            else{
+                                clearCells.add(p);
+                            }
+                        }
+                    }
+                    else{
+                        record.put(status,player_id);
+                    }
                 }
             }
         }
@@ -595,6 +649,7 @@ public class Player implements spy.sim.Player {
 
         // once target and packet both found, move to packet
         if (pack != null && dest != null){
+            pathFound = true;
             // if we are at package, and we have found both package and target. MOVE BETWEEN PACKAGE AND TARGET
             if (loc.x==pack.x && loc.y==pack.y){
 
@@ -618,27 +673,34 @@ public class Player implements spy.sim.Player {
 
 
             // move back and forth between package and target
-            if (path_to_package == null){
-                path_to_package = new ArrayList<Point>();
-                path_to_package = BFS_not_muddy(loc, pack);
-            }
-            
-            if (path_to_package.size() == 0){
-                path_to_package = null;
-            }
-            
-            if (path_to_package == null){
-                System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
-                return new Point(0, 0);
-            }
+            if (step > 50){            
+                if (path_to_package == null){
+                    path_to_package = new ArrayList<Point>();
+                    path_to_package = BFS_not_muddy(loc, pack);
+                    
+                }
+                else{
+                    Point destination = path_to_package.remove(0);
+                    return new Point(destination.x-loc.x,destination.y-loc.y);
+                }
+                
+                if (path_to_package.size() == 0){
+                    path_to_package = null;
+                }
+                
+                if (path_to_package == null){
+                    System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+                    return new Point(0, 0);
+                }
 
-            path_to_package.remove(0);
-            Point toPackage = path_to_package.get(0);
-            move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
-            loc = new Point(toPackage.x, toPackage.y);
-            System.out.println(this.id + " is moving to " + move.x + "," + move.y);
-            return move;
-
+ 
+                path_to_package.remove(0);
+                Point toPackage = path_to_package.get(0);
+                move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+                loc = new Point(toPackage.x, toPackage.y);
+                System.out.println(this.id + " is moving to " + move.x + "," + move.y);
+                return move;
+            }
 
 
             // if (pTodPath.size()==0){
@@ -811,8 +873,6 @@ public class Player implements spy.sim.Player {
             Point dest = currentPath.remove(0);
             return new Point(dest.x-loc.x,dest.y-loc.y);
         }
-
-
 
         //System.out.println("curr n_obs size: "+notobserved.size());
 

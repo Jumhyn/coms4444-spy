@@ -51,6 +51,13 @@ public class Player implements spy.sim.Player {
     private List<Point> path_to_package = null;
     private HashMap<Point, HashMap<Integer, Integer>> receivedInfo;
     private boolean isSpy = false;
+    private boolean verify = false;
+    private List<Point> verifyingPath;
+    private int verifyIndex = 0;
+    private boolean verified = false;
+    private boolean unverified = false;
+    private int possiblePathId = -1;
+    private int verifiedPathId = -1;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -75,6 +82,7 @@ public class Player implements spy.sim.Player {
         this.n = n;
         this.receivedInfo = new HashMap<Point, HashMap<Integer, Integer>>();
         this.isSpy = isSpy;
+        this.verifyingPath = new ArrayList<Point>();
 
         this.waitTime = new HashMap<Integer,Integer>();
         for(int i=0;i<n;i++) {
@@ -506,17 +514,45 @@ public class Player implements spy.sim.Player {
     
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        ArrayList<Integer> toReturn = new ArrayList<Integer>();
+        if(verifiedPathId>0) {
+            toReturn.add(verifiedPathId);
+            verified = false;
+            unverified = false;
+        }
+        for (Map.Entry<Integer, List<Point>> entry : paths.entrySet()) {
+            if (entry.getKey() == this.id) {
+                toReturn.add(entry.getKey()); // always accept our path
+            }
+        }
+
         if (isSpy == true)
-            return null;
+            return toReturn;
 
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
         {
-            ArrayList<Integer> toReturn = new ArrayList<Integer>();
-            toReturn.add(entry.getKey());
-            //return entry.getKey();
-            return toReturn;                                    // maybe change something here to make sure we output path? MAYBE
+            List<Point> potential = entry.getValue();
+            boolean looksGood = true;
+            boolean verifyPotential = true;
+            for (int i=0;i<potential.size();i++) {
+                if (!clearCells.contains(potential.get(i))) {
+                    looksGood = false;
+                }
+                if (muddyCells.contains(potential.get(i)) || waterCells.contains(potential.get(i))) {
+                    verifyPotential = false; // as soon as encounter a muddy cell
+                } 
+            }
+            if (looksGood) {
+                toReturn.add(entry.getKey());                  
+            }   
+            else if (verifyPotential) {
+                verifyingPath = potential;
+                verify = true;
+                possiblePathId = entry.getKey();
+            }                  
         }
-        return null;
+
+        return toReturn;  
     }
     
     public void receiveResults(HashMap<Integer, Integer> results)
@@ -670,6 +706,44 @@ public class Player implements spy.sim.Player {
                 //reset waittime
                 waitTime.put(meetSoldiers.get(i),wait);
             }
+        }
+
+        // VERIFYING PATH STUFF
+        if (verify == true) { // we are verifying a path
+            System.out.println("VERIFYING");
+            //verify index = 0 at beginning
+            Point pathPt = verifyingPath.get(verifyIndex);
+            //make sure pathPt is a clear cell, if not return to package
+            if (pathPt == dest ) {
+                verified = true;
+                verifiedPathId = possiblePathId;
+                verify = false;
+                verifyIndex = 0;
+            }
+            else if (clearCells.contains(pathPt)) {
+                loc = new Point(pathPt);
+                verifyIndex ++;
+                return new Point(pathPt.x - loc.x, pathPt.y - loc.y);
+            }
+            else { // they liedddddd
+                //return to package
+                unverified = true;
+                verify = false;
+                verifyIndex = 0;
+                possiblePathId = -1;
+            }
+
+        }
+
+        if (verified == true || unverified == true) { // we finished verifying a path
+            System.out.println("FINISHED VERIFYING");
+            path_to_package = BFS_not_muddy(loc, pack);
+            Point toPackage = path_to_package.get(0);
+            path_to_package.remove(0);
+            move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+            loc = new Point(toPackage.x, toPackage.y);
+            System.out.println(this.id + " is moving to " + move.x + "," + move.y);
+            return move;
         }
 
         //whatISee(neighbors);
@@ -839,7 +913,9 @@ public class Player implements spy.sim.Player {
                     return new Point(0, 0);
                 }
                 else {
-                    return new Point (destination.x - loc.x, destination.y - loc.y);
+                    move = new Point(destination.x - loc.x, destination.y - loc.y);
+                    loc = new Point(destination.x, destination.y);
+                    return move;
                 }
             }
             else {//if (destination.x!=loc.x || destination.y!=loc.y){
@@ -947,6 +1023,7 @@ public class Player implements spy.sim.Player {
         else { // when we have finished observing, should not be called 
             int x = rand.nextInt(2) * 2 - 1;
             int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
+            loc = new Point(loc.x + x, loc.y + y);
             move = new Point(x, y);
         }
 

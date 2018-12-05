@@ -67,7 +67,7 @@ import java.util.Random;
         Random rand = new Random();
         for (int i = 0; i < 30; i++)
         {
-            Point p = new Point(rand.nextInt(100), rand.nextInt(100));
+            Point p = new Point(rand.nextInt(25) + 74, rand.nextInt(25) + 74);
             while (waterCells.contains(p))
             {
                 p = new Point(rand.nextInt(100), rand.nextInt(100));

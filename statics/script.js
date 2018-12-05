@@ -66,12 +66,14 @@ function drawPlayers(ctx, players)
         }
         else
         {
-            ctx.fillStyle=colors[i];
+            ctx.fillStyle=colors[i % 9];
         }
         
         ctx.beginPath();
         ctx.arc(p.x * 10 + 5, p.y * 10 + 5, 4, 0, 2*Math.PI);
         ctx.arc(1030, 50 * i + 20, 10, 0, 2*Math.PI);
+        ctx.font = "12px Arial";
+        ctx.fillText(p.name[1], p.x * 10 + 12, p.y * 10 + 12);
         ctx.fill();
         
         ctx.font = "30px Arial";

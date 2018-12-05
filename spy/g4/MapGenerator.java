@@ -27,7 +27,8 @@ public class MapGenerator implements spy.sim.MapGenerator {
 		Random rand = new Random();
 		int p = rand.nextInt(3);
 		PATH = path_p + paths.get(p);
-		System.out.println("map path: " + PATH);
+		//PATH = "spy/g4/smallmap.txt";
+		//System.out.println("map path: " + PATH);
 
 		
 		waterCells = new ArrayList<Point>();
@@ -88,5 +89,15 @@ public class MapGenerator implements spy.sim.MapGenerator {
             startingLocations.add(p);
         }
         return startingLocations;
+        /*for (int i = 0; i < 10; i++)
+        {
+            Point p = new Point(rand.nextInt(10), rand.nextInt(10));
+            while (waterCells.contains(p))
+            {
+                p = new Point(rand.nextInt(10), rand.nextInt(10));
+            }
+            startingLocations.add(p);
+        }
+        return startingLocations;*/
     }
 }

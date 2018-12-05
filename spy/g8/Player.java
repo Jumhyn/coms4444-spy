@@ -58,6 +58,7 @@ public class Player implements spy.sim.Player {
     private boolean unverified = false;
     private int possiblePathId = -1;
     private int verifiedPathId = -1;
+    private int wait_at_pack = 0;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -198,6 +199,7 @@ public class Player implements spy.sim.Player {
         if (isSpy == true){
             ArrayList<Record> toSend = new ArrayList<Record>();
             Collections.sort(muddyCells, pointComparator);
+            if(muddyCells.size()==0) return new ArrayList<Record>();
             Point farthest_mud = muddyCells.get(muddyCells.size()-1);
             Record muddy_record = new Record(farthest_mud, 0, 1, new ArrayList<Observation>());
             int id_to_send;
@@ -514,6 +516,7 @@ public class Player implements spy.sim.Player {
     
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        System.out.println("----------Voting-----------");
         ArrayList<Integer> toReturn = new ArrayList<Integer>();
         if(verifiedPathId>0) {
             toReturn.add(verifiedPathId);
@@ -551,7 +554,10 @@ public class Player implements spy.sim.Player {
                 possiblePathId = entry.getKey();
             }                  
         }
-
+        for(Integer i:toReturn){
+            System.out.print(i);
+        }
+        System.out.println();
         return toReturn;  
     }
     
@@ -755,7 +761,7 @@ public class Player implements spy.sim.Player {
         if (pack != null && dest != null){
             pathFound = true;
             // if we are at package, and we have found both package and target. MOVE BETWEEN PACKAGE AND TARGET
-            if (loc.x==pack.x && loc.y==pack.y){
+            if (loc.x==pack.x && loc.y==pack.y && wait_at_pack<=500){
 
                 // even at package, when both players together, reset wait time to help run simulator fast
                 /*for(int id:waitTime.keySet()){
@@ -771,21 +777,35 @@ public class Player implements spy.sim.Player {
                 // if (pathFound){
                 //     return new Point(0, 0);
                 // }
-
+                wait_at_pack += 1;
+                if (wait_at_pack > 500){
+                    step = 0;
+                }
                 return new Point(0, 0);
             }
+            else{
+                wait_at_pack = 0;
+            }
 
-
-            // move back and forth between package and target
-            if (step > 500){            
-                if (path_to_package == null){
+            if (step > 200){            
+                if (path_to_package == null ||path_to_package.size() == 0){
                     path_to_package = new ArrayList<Point>();
                     path_to_package = BFS_not_muddy(loc, pack);
-                    
+                    System.out.println("loc:"+loc.x+","+loc.y+";");
                     // lol somebody cheated us and so we could not find proper path. Alas we need to find pack and dest again :/
                     if (path_to_package == null){
                         pack = null;
                         dest = null;
+                        pathFound = false;
+                    }
+                    else{
+                        for(Point i:path_to_package){
+                            System.out.print(i.x+","+i.y+";");
+                        }
+                        System.out.println();
+                        path_to_package.remove(0);
+                        Point toPackage = path_to_package.remove(0);
+                        return new Point(toPackage.x-loc.x, toPackage.y-loc.y);
                     }
                 }
                 else{
@@ -793,21 +813,19 @@ public class Player implements spy.sim.Player {
                     // Point destination = path_to_package.remove(0);
                     // return new Point(destination.x-loc.x,destination.y-loc.y);
 
-                    if (path_to_package.size() == 0){
-                        path_to_package = null;
-                    }
+                    // if (path_to_package.size() == 0){
+                    //     path_to_package = null;
+                    // }
                     
-                    if (path_to_package == null){
-                        System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
-                        return new Point(0, 0);
-                    }
+                    // if (path_to_package == null){
+                    //     System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+                    //     return new Point(0, 0);
+                    // }
 
      
-                    path_to_package.remove(0);
-                    Point toPackage = path_to_package.get(0);
+                    //path_to_package.remove(0);
+                    Point toPackage = path_to_package.remove(0);
                     move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
-                    loc = new Point(toPackage.x, toPackage.y);
-                    System.out.println(this.id + " is moving to " + move.x + "," + move.y);
                     return move;
                 }
             }
@@ -961,6 +979,9 @@ public class Player implements spy.sim.Player {
         if (pack!=null || dest!=null){
             Collections.sort(notobserved, pointComparator);     // find nearesr unseen point
             int total_unobserved = Math.min(notobserved.size(), 5);     // to have some randomness in player
+            if (total_unobserved == 0){
+                destination=observed.get(rand.nextInt(observed.size()-1));
+            }
             destination = notobserved.get(rand.nextInt(total_unobserved));
 
             //System.out.println("Destination chosen: " + destination);

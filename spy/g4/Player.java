@@ -60,6 +60,8 @@ public class Player implements spy.sim.Player {
 
     private Random rand;
 
+    private List<Point> winningPath;
+
     // Spy variables
     private boolean isSpy;
     private int spy = -1; // player who we think is the spy
@@ -112,6 +114,8 @@ public class Player implements spy.sim.Player {
         //maxScores = new ArrayList<Point>();
 
         //rand = new Random();
+
+        winningPath = new ArrayList<Point>();
 
     }
     
@@ -647,7 +651,7 @@ public class Player implements spy.sim.Player {
     
     public List<Point> proposePath()
     {
-        return null;
+        return winningPath;
     }
 
     // getVotes() gets as input all the proposed paths and a list of corresponding player IDs
@@ -741,7 +745,7 @@ public class Player implements spy.sim.Player {
                 return new Point(newP.x - this.loc.x, newP.y - this.loc.y);
 
 
-            } else { pathKnown = false; calculatePath();}
+            } else { pathKnown = false; winningPath = calculatePath();}
             /*else if (pathToPackage.isEmpty()) { //&& movingToPackage == true) {
                 //waitingAtPackage = true;
                 System.err.println("waitingAtPackage (2) " + this.loc);
@@ -757,7 +761,7 @@ public class Player implements spy.sim.Player {
             moveToSoldier = false;
             
             System.err.println(this.id + " movement for KNOWN PACKAGE or TARGET");
-            calculatePath();
+            winningPath = calculatePath();
             return moves.get(0).nextMove();
         
         } //else {

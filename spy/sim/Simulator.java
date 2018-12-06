@@ -112,7 +112,6 @@ public class Simulator {
         }
         Collections.shuffle(shuffle);
 
-        spyID = shuffle.get(spyID);
         ArrayList<String> playerNamesClone = new ArrayList<String>(playerNames);
         for (int i = 0; i < num_players; i++)
         {
@@ -122,6 +121,7 @@ public class Simulator {
         for (int i = 0; i < playerNames.size(); i++)
         {
             System.out.println("Player " + i + ": " + playerNames.get(i));
+            Log.record("Player " + i + ": " + playerNames.get(i));
         }
         
         if (seed == -1)
@@ -136,9 +136,12 @@ public class Simulator {
             if (spyID == -1) {
                 spyID = rand.nextInt(num_players);
             }
+            spyID = shuffle.get(spyID);
             System.out.println("Player " + spyID + " is spy");
+            Log.record("Player " + spyID + " is spy");
         } else
         {
+            Log.record("NO SPY!");
             spyID = -1;
         }
         
@@ -268,14 +271,17 @@ public class Simulator {
         if (victory)
         {
             System.out.println("\nEND: SUCCESS! Score: " + elapsedT);
+            Log.record("\nEND: SUCCESS! Score: " + elapsedT);
         }
         else if (elapsedT >= t)
         {
             System.out.println("\nEND: RAN OUT OF TIME! Score: " + t);
+            Log.record("\nEND: RAN OUT OF TIME! Score: " + t);
         }
         else
         {
             System.out.println("\nEND: INVALID PATH! Score: " + 2 * t);
+            Log.record("\nEND: INVALID PATH! Score: " + 2 * t);
         }
 
         if (gui)
@@ -345,6 +351,8 @@ public class Simulator {
                 if (!player1Loc.equals(player2Loc)) continue;
                 
                 List<Record> records = players.get(i).sendRecords(j);
+                if (records == null) records = new ArrayList<Record>();
+                
                 ArrayList<Record> copy = new ArrayList<Record>();
                 for (Record r : records)
                 {

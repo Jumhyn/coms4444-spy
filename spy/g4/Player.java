@@ -724,15 +724,22 @@ public class Player implements spy.sim.Player {
 
         } else if (pathKnown) {
             
-            System.err.println(this.id + " movement for KNOWN PATH");
+            System.err.println(this.id + " movement for KNOWN PATH pathToPackage size: " + pathToPackage.size());
+            for (Point i : pathToPackage) {
+                System.err.print(i.toString());
+            }
+            System.err.println("\n current loc = " + loc.toString());
             // move to the package
             if ((pathToPackage != null) && (!pathToPackage.isEmpty())) {
                 //movingToPackage = true;
                 System.err.println("moving to package");
                 stayPut = false;
                 moveToSoldier = false;
-                return pathToPackage.remove();
-            
+                Point newP = pathToPackage.remove();
+                System.err.print("Move to point: " + new Point(newP.x - this.loc.x, newP.y = this.loc.y));
+                return new Point(newP.x - this.loc.x, newP.y = this.loc.y);
+
+
             } /*else if (pathToPackage.isEmpty()) { //&& movingToPackage == true) {
                 //waitingAtPackage = true;
                 System.err.println("waitingAtPackage (2) " + this.loc);

@@ -717,7 +717,7 @@ public class Player implements spy.sim.Player {
         if ((pathKnown) && (previousStatuses.get(this.loc).getPT() == 1)) {
 
             //calculatePath();
-            System.err.println("waitingAtPackage (1) " + this.loc);
+            System.err.println(this.id + " waitingAtPackage (1) " + this.loc);
             stayPut = false;
             moveToSoldier = false;
             return new Point(0, 0);
@@ -725,22 +725,24 @@ public class Player implements spy.sim.Player {
         } else if (pathKnown) {
             
             System.err.println(this.id + " movement for KNOWN PATH pathToPackage size: " + pathToPackage.size());
+            System.err.print(this.id + ": ");
             for (Point i : pathToPackage) {
                 System.err.print(i.toString());
             }
-            System.err.println("\n current loc = " + loc.toString());
+            System.err.println("\n" + this.id + " current loc = " + loc.toString());
             // move to the package
             if ((pathToPackage != null) && (!pathToPackage.isEmpty())) {
                 //movingToPackage = true;
-                System.err.println("moving to package");
+                System.err.println(this.id + " moving to package");
                 stayPut = false;
                 moveToSoldier = false;
                 Point newP = pathToPackage.remove();
-                System.err.print("Move to point: " + new Point(newP.x - this.loc.x, newP.y = this.loc.y));
-                return new Point(newP.x - this.loc.x, newP.y = this.loc.y);
+                System.err.println(this.id + " move to point: " + new Point(newP.x - this.loc.x, newP.y - this.loc.y));
+                return new Point(newP.x - this.loc.x, newP.y - this.loc.y);
 
 
-            } /*else if (pathToPackage.isEmpty()) { //&& movingToPackage == true) {
+            } else { pathKnown = false; calculatePath();}
+            /*else if (pathToPackage.isEmpty()) { //&& movingToPackage == true) {
                 //waitingAtPackage = true;
                 System.err.println("waitingAtPackage (2) " + this.loc);
                 stayPut = false;

@@ -23,9 +23,9 @@ public class Player implements spy.sim.Player {
     private ArrayList<ArrayList<Record>> records;
     private int id;
     public Point loc;
-    private List<Point> waterCells;
-    private List<Point> clear_muddy_cells;
-    private List<Point> clearCells;
+    private Set<Point> waterCells;
+    private Set<Point> clear_muddy_cells;
+    private Set<Point> clearCells;
     private List<Point> muddyCells;
     private List<Point> observed;
     private List<Point> notobserved;
@@ -66,8 +66,11 @@ public class Player implements spy.sim.Player {
         this.loc = startingPos;
         this.destination = startingPos;
         this.records = new ArrayList<ArrayList<Record>>();
-        this.waterCells = waterCells;
-        this.clear_muddy_cells = new ArrayList<Point>();
+        this.waterCells = new HashSet<Point>();
+        for (Point p:waterCells){
+            this.waterCells.add(p);
+        }
+        this.clear_muddy_cells = new HashSet<Point>();
         this.observed = new ArrayList<Point>();
         this.notobserved = new ArrayList<Point>();
         this.move = new Point(0,0);
@@ -75,7 +78,7 @@ public class Player implements spy.sim.Player {
         this.receivedRecords = new HashMap<Integer, List<Record>>();
         this.meetSoldiers = new ArrayList<Integer>();
         this.trySoldier = -1;
-        this.clearCells = new ArrayList<Point>();
+        this.clearCells = new HashSet<Point>();
         this.rand = new Random();
         this.pTodPath = new ArrayList<Point>();
         this.currentPath = new ArrayList<Point>();
@@ -516,7 +519,7 @@ public class Player implements spy.sim.Player {
     
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
-        System.out.println("----------Voting-----------");
+        System.out.println("---------"+this.id+" Voting-----------");
         ArrayList<Integer> toReturn = new ArrayList<Integer>();
         if(verifiedPathId>0) {
             toReturn.add(verifiedPathId);
@@ -558,7 +561,10 @@ public class Player implements spy.sim.Player {
             System.out.print(i);
         }
         System.out.println();
-        return toReturn;  
+        Collections.sort(toReturn);
+        List<Integer> returnID = new ArrayList<>();
+        returnID.add(toReturn.get(0));
+        return returnID;  
     }
     
     public void receiveResults(HashMap<Integer, Integer> results)
@@ -982,8 +988,9 @@ public class Player implements spy.sim.Player {
             if (total_unobserved == 0){
                 destination=observed.get(rand.nextInt(observed.size()-1));
             }
-            destination = notobserved.get(rand.nextInt(total_unobserved));
-
+            else{
+                destination = notobserved.get(rand.nextInt(total_unobserved));
+            }
             //System.out.println("Destination chosen: " + destination);
             List<Point> path = BFS_not_muddy(loc, destination);
 

@@ -217,8 +217,8 @@ public class Player implements spy.sim.Player {
 
                 if (recR != null) {
                     
-                    if (recR.getPT() == 1) {packageKnown = true; System.err.println("Soldier " + this.id + " knows where package is");}
-                    else if (recR.getPT() == 2) {targetKnown = true; System.err.println("Soldier " + this.id + " knows where target is");}
+                    if (recR.getPT() == 1) {packageKnown = true; /*System.err.println("Soldier " + this.id + " knows where package is");*/}
+                    else if (recR.getPT() == 2) {targetKnown = true; /*System.err.println("Soldier " + this.id + " knows where target is");*/}
 
                     Point p = recR.getLoc();
                     Record ourRecord = this.records.get(p.x).get(p.y);
@@ -292,7 +292,7 @@ public class Player implements spy.sim.Player {
         // ### Quincy's code here ###
         // ##########################
 
-        System.err.println("Soldier" + this.id + "  ###########  seeing how I should move ###########");
+        //System.err.println("Soldier" + this.id + "  ###########  seeing how I should move ###########");
 
         List<Point> finalPath = new ArrayList<Point>();
 
@@ -314,13 +314,13 @@ public class Player implements spy.sim.Player {
         for (Point key : trueRecords.keySet()) {
             int pt = trueRecords.get(key).getPT();
             if (pt == 1) { /* package location */
-                System.out.println("G4" + " ID: " + this.id);                
-                System.err.println("I FOUND PACKAGE LOCATION");
+                //System.out.println("G4" + " ID: " + this.id);                
+                //System.err.println("I FOUND PACKAGE LOCATION");
                 pac = key;
             }
             if (pt == 2) { /* target location */
-                System.out.println("G4" + " ID: " + this.id);
-                System.err.println("I FOUND TARGET LOCATION");
+                //System.out.println("G4" + " ID: " + this.id);
+                //System.err.println("I FOUND TARGET LOCATION");
                 tar = key;
             }
             if (tar != null && pac != null) {
@@ -455,13 +455,13 @@ public class Player implements spy.sim.Player {
         }
 
 
-        if (finalPath != null) {
-            for(Point x: finalPath) {
-                System.err.print("(" + x.x + ", " + x.y + "),");
-            }
-        } else {
-            System.err.println("finalPath is null");
-        }
+        //if (finalPath != null) {
+        //    for(Point x: finalPath) {
+        //        System.err.print("(" + x.x + ", " + x.y + "),");
+        //    }
+        //} else {
+        //    System.err.println("finalPath is null");
+        //}
         // System.err.println("###########END###########################################\n");
 
         return finalPath;
@@ -547,7 +547,7 @@ public class Player implements spy.sim.Player {
             System.err.println("current: (" + current.x + ", " + current.y +")");*/
             /* goal test */
             if (current.equals(tar)) {
-                System.err.println("goal reached");
+                //System.err.println("goal reached");
                 goal_reached = true;
             }
             /* add to visited */
@@ -579,7 +579,7 @@ public class Player implements spy.sim.Player {
             System.err.println("End path\n");*/
             /* if goal test successful */
             if (goal_reached == true) {
-                System.err.println("goal reached break");
+                //System.err.println("goal reached break");
                 break;
             }
             /* adds all children that's not visited to queue
@@ -652,13 +652,13 @@ public class Player implements spy.sim.Player {
         }
 
 
-        if (finalPath != null) {
-            for(Point x: finalPath) {
-                System.err.print("(" + x.x + ", " + x.y + "),");
-            }
-        } else {
-            System.err.println("finalPath is null");
-        }
+        //if (finalPath != null) {
+        //    for(Point x: finalPath) {
+        //        System.err.print("(" + x.x + ", " + x.y + "),");
+        //    }
+        //} else {
+        //    System.err.println("finalPath is null");
+        //}
         // System.err.println("###########END###########################################\n");
 
         return finalPath;
@@ -674,7 +674,7 @@ public class Player implements spy.sim.Player {
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     { 
         // list of players we agree with 
-        System.out.println("\n*****************    getVotes() invoked     ******************\n ");
+        //System.out.println("\n*****************    getVotes() invoked     ******************\n ");
         ArrayList<Integer> toReturn = new ArrayList<Integer>(); 
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet()) // all the lists
         { 
@@ -685,7 +685,7 @@ public class Player implements spy.sim.Player {
                 toReturn.add(entry.getKey()); // 
             } 
         }
-        System.out.println("player " + this.id + "voting for " + toReturn);
+        //System.out.println("player " + this.id + "voting for " + toReturn);
         return toReturn;
     }
 
@@ -701,7 +701,7 @@ public class Player implements spy.sim.Player {
             }
         }
         // indices of the proposed Path  
-        System.out.println("*******8CALCULATING VALID MOVE....*********");
+        //System.out.println("*******8CALCULATING VALID MOVE....*********");
         int i = 0;
         int f = proposedPath.size() - 1; 
 
@@ -723,7 +723,7 @@ public class Player implements spy.sim.Player {
                 }
                 if (i != 0 && i != f) { 
                     if (record.getPT() != 0) { // needs to be ordinary 
-                        System.err.println(record.getPT()); 
+                        //System.err.println(record.getPT()); 
                         return false; 
                     } 
                     if (Math.abs(point.x - prevX) > 1 || Math.abs(point.y - prevY) > 1) {
@@ -733,7 +733,7 @@ public class Player implements spy.sim.Player {
                 }
             } // end of for loop
         }
-        System.out.println("Yes, valid move");
+        //System.out.println("Yes, valid move");
         return true; // if all passed 
     }
     
@@ -751,23 +751,23 @@ public class Player implements spy.sim.Player {
         if ((pathKnown) && (previousStatuses.get(this.loc).getPT() == 1)) {
 
             //calculatePath();
-            System.err.println(this.id + " ALREADY AT PACKAGE....WAITING..... " + this.loc);
+            //System.err.println(this.id + " ALREADY AT PACKAGE....WAITING..... " + this.loc);
             stayPut = false;
             moveToSoldier = false;
             return new Point(0, 0);
 
         } else if (pathKnown) {
             
-            System.err.println("SINCE PATH IS KNOWN, soldier " + this.id + "moving to package. Path size currently : " + pathToPackage.size());
-            System.err.print(this.id + ": ");
-            for (Point i : pathToPackage) {
-                System.err.print(i.toString());
-            }
-            System.err.println("\n" + this.id + " current loc = " + loc.toString());
+            //System.err.println("SINCE PATH IS KNOWN, soldier " + this.id + "moving to package. Path size currently : " + pathToPackage.size());
+            //System.err.print(this.id + ": ");
+            //for (Point i : pathToPackage) {
+            //    System.err.print(i.toString());
+            //}
+            //System.err.println("\n" + this.id + " current loc = " + loc.toString());
             // move to the package
             if ((pathToPackage != null) && (!pathToPackage.isEmpty())) {
                 //movingToPackage = true;
-                System.err.println(this.id + " MOVING TO PACKGE");
+                //System.err.println(this.id + " MOVING TO PACKGE");
                 stayPut = false;
                 moveToSoldier = false;
                 Point newP = pathToPackage.remove();
@@ -810,8 +810,8 @@ public class Player implements spy.sim.Player {
 
         if (moveToSoldier) {
             // move in the direction of a soldier
-            System.err.println(this.id + "LALALALLALALALALALALL----------LET'S COMMUNICATE: move towards soldier ---------LALALALLALALALALALALLALALAA");
-            System.err.println(nearbySoldier);
+            //System.err.println(this.id + "LALALALLALALALALALALL----------LET'S COMMUNICATE: move towards soldier ---------LALALALLALALALALALALLALALAA");
+            //System.err.println(nearbySoldier);
             moveToSoldier = false;
             if (nearbySoldier.x != 0 || nearbySoldier.y != 0) return nearbySoldier; //{calculatePath(); return nearbySoldier;}
         }
@@ -819,10 +819,10 @@ public class Player implements spy.sim.Player {
         stayPut = false;
         moveToSoldier = false;
 
-        System.err.println(this.id + " EXPLORATION MOVE");
+        //System.err.println(this.id + " EXPLORATION MOVE");
 
         // Explore randomly
-        System.err.println("moves: " + moves.size());
+        //System.err.println("moves: " + moves.size());
         //calculatePath();
         return moves.get(0).nextMove();
 

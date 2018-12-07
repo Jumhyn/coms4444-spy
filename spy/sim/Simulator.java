@@ -393,6 +393,7 @@ public class Simulator {
         HashMap<Integer, Integer> counts = new HashMap<Integer, Integer>();
         for (int i : playersPresent)
         {
+            System.out.println("Player ID who are at the package location" + i);
             List<Integer> votes = players.get(i).getVotes(proposals);
             if (votes != null)
             {
@@ -415,6 +416,8 @@ public class Simulator {
             {
                 maxCount = entry.getValue();
                 winningPath = proposals.get(entry.getKey());
+                System.out.println("winning path is");
+                System.out.println(winningPath);
             }
             else if (entry.getValue() == maxCount)
             {

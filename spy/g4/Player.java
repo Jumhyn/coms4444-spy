@@ -23,6 +23,8 @@ public class Player implements spy.sim.Player {
     
     private ArrayList<ArrayList<Record>> records;
     private int id;
+    private int waitTime;
+    private int commCount; // not used
     private Point loc;
     public Point sharedLoc;
     private int numPlayers;
@@ -45,6 +47,7 @@ public class Player implements spy.sim.Player {
     private boolean stayPut = false;
     private boolean recordsReceived = false;
     private int stayPutCounts = 0;
+    private int prevSoldier; // not used
     private static final int maxWaitTime = 8;
 
     private static boolean movingToPackage = false;
@@ -78,6 +81,8 @@ public class Player implements spy.sim.Player {
         this.numPlayers = n;
         this.totalTime = t;
         this.id = id;
+        this.prevSoldier = -1;
+        this.commCount = 0;
         this.records = new ArrayList<ArrayList<Record>>();
         this.observedCells = new ArrayList<ArrayList<Boolean>>();
         for (int i = 0; i < 100; i++)
@@ -191,44 +196,52 @@ public class Player implements spy.sim.Player {
     
     public void receiveRecords(int id, List<Record> records)
     {
-        // System.err.println("> " + this.id + " RECEIVES from " + id + " <");
+        // if (prevSoldier == id) {
+        //     commCount++;
+        // }
+        // prevSoldier = id; // if different  
+        // if (commCount < 5) {
+            // System.err.println("> " + this.id + " RECEIVES from " + id + " <");
 
-        recordsReceived = true;
+            recordsReceived = true;
 
-        // Assuming no spies
-        int numRecs = 0;
-        for (ArrayList<Record> rL : this.records) {
-            for (Record r : rL) {
-                if (r!=null) {numRecs += 1;}
-            }
-        }
-        // System.err.println("< initial length of records = " + numRecs);
-        for (Record recR : records) {
-
-            if (recR != null) {
-                
-                if (recR.getPT() == 1) {packageKnown = true; System.err.println(this.id + " knows where PACKAGE is!!");}
-                else if (recR.getPT() == 2) {targetKnown = true; System.err.println(this.id + " knows where TARGET is!!");}
-
-                Point p = recR.getLoc();
-                Record ourRecord = this.records.get(p.x).get(p.y);
-
-                if (ourRecord == null) {
-                    ourRecord = new Record(p, recR.getC(), recR.getPT(), recR.getObservations());
-                    this.records.get(p.x).set(p.y, ourRecord);
-                    trueRecords.put(p, ourRecord);
+            // Assuming no spies
+            int numRecs = 0;
+            for (ArrayList<Record> rL : this.records) {
+                for (Record r : rL) {
+                    if (r!=null) {numRecs += 1;}
                 }
             }
-        }
-        numRecs = 0;
-        for (ArrayList<Record> rL : this.records) {
-            for (Record r : rL) {
-                if (r!=null) {numRecs += 1;}
-            }
-        }
-        // System.err.println(">>>> new length of records = " + numRecs);
+            // System.err.println("< initial length of records = " + numRecs);
+            for (Record recR : records) {
 
-        lastPlayerComm = id;
+                if (recR != null) {
+                    
+                    if (recR.getPT() == 1) {packageKnown = true; System.err.println("Soldier " + this.id + " knows where package is");}
+                    else if (recR.getPT() == 2) {targetKnown = true; System.err.println("Soldier " + this.id + " knows where target is");}
+
+                    Point p = recR.getLoc();
+                    Record ourRecord = this.records.get(p.x).get(p.y);
+
+                    if (ourRecord == null) {
+                        ourRecord = new Record(p, recR.getC(), recR.getPT(), recR.getObservations());
+                        this.records.get(p.x).set(p.y, ourRecord);
+                        trueRecords.put(p, ourRecord);
+                    }
+                }
+            }
+            numRecs = 0;
+            for (ArrayList<Record> rL : this.records) {
+                for (Record r : rL) {
+                    if (r!=null) {numRecs += 1;}
+                }
+            }
+            // System.err.println(">>>> new length of records = " + numRecs);
+
+            lastPlayerComm = id;
+        // } else {
+        //     commCount = 0;
+        // }
 
         //calculatePath();
 
@@ -279,7 +292,7 @@ public class Player implements spy.sim.Player {
         // ### Quincy's code here ###
         // ##########################
 
-        System.err.println("###########  calculating path ###############################");
+        System.err.println("Soldier" + this.id + "  ###########  seeing how I should move ###########");
 
         List<Point> finalPath = new ArrayList<Point>();
 
@@ -387,7 +400,7 @@ public class Player implements spy.sim.Player {
             System.err.println("End path\n");*/
             /* if goal test successful */
             if (goal_reached == true) {
-                System.err.println("goal reached break");
+                // System.err.println("goal reached break");
                 break;
             }
             /* adds all children that's not visited to queue
@@ -666,7 +679,9 @@ public class Player implements spy.sim.Player {
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet()) // all the lists
         { 
             // if player proposed a valid path
-            if (this.isValidPath(entry.getValue())) { 
+            if (entry.getKey() == this.id) {
+                toReturn.add(id);
+            } else if (this.isValid(entry.getValue())) { 
                 toReturn.add(entry.getKey()); // 
             } 
         }
@@ -677,43 +692,48 @@ public class Player implements spy.sim.Player {
     // ** ASSUMES proposed path = [ package location, ... (list of clear cells), target location ]
     // isValidPath() gets as input a proposed path from getVotes()
     // it returns a boolean, true if path is valid  
-    private boolean isValidPath(List<Point> proposedPath) {
-
-        if (proposedPath.equals(winningPath)) { // if it's our own path
-            return true; 
-        }
-
-        int f = proposedPath.size() - 1; 
-        int i = 0;
-        for (Point point : proposedPath) {
-            Record record = records.get(point.x).get(point.y); // corresponding record 
-            // matching record must exist and cell condition must be clear (0) 
-            if (record == null || record.getC() != 0) { // must be clear 
+    private boolean isValid(List<Point> proposedPath) {
+        if (proposedPath.equals(winningPath)) { // should not be our own path 
+            if (waitTime++ + this.id > 5) {
+                return true;
+            } else {
                 return false;
             }
-            if (i == 0) { // if clear check the type of cell 
-                // package location 
-                if (record.getPT() != 1) {  
-                    System.out.println(record.getPT());
+        }
+        // indices of the proposed Path  
+        System.out.println("*******8CALCULATING VALID MOVE....*********");
+        int i = 0;
+        int f = proposedPath.size() - 1; 
+
+        Point startPoint = proposedPath.get(i);
+        Point finalPoint = proposedPath.get(f);
+
+        Record startRecord = records.get(startPoint.x).get(startPoint.y);
+        Record finalRecord = records.get(finalPoint.x).get(finalPoint.y);
+
+        if (startRecord.getPT() == 1 && finalRecord.getPT() == 2) {
+
+            int prevX = startPoint.x;
+            int prevY = startPoint.y;
+
+            for (Point point : proposedPath) {
+                Record record = records.get(point.x).get(point.y);  
+                if (record == null || record.getC() != 0) { // needs to be traversable  
                     return false;
-                } else {
-                    i++; // if it is package
                 }
-            } else if (i == f) {
-                // target location 
-                if (record.getPT() != 2) { // is not package
-                    System.err.println(record.getPT());
-                    return false;
+                if (i != 0 && i != f) { 
+                    if (record.getPT() != 0) { // needs to be ordinary 
+                        System.err.println(record.getPT()); 
+                        return false; 
+                    } 
+                    if (Math.abs(point.x - prevX) > 1 || Math.abs(point.y - prevY) > 1) {
+                        return false;
+                    }
+                    i++;
                 }
-            } else {
-                // ordinary cell 
-                if (record.getPT() != 0) {
-                    System.err.println(record.getPT());
-                    return false; 
-                }
-                i++;
-            }
-        } // end of for loop
+            } // end of for loop
+        }
+        System.out.println("Yes, valid move");
         return true; // if all passed 
     }
     
@@ -790,7 +810,7 @@ public class Player implements spy.sim.Player {
 
         if (moveToSoldier) {
             // move in the direction of a soldier
-            System.err.println(this.id + " LET'S COMMUNICATE: move to soldier");
+            System.err.println(this.id + "LALALALLALALALALALALL----------LET'S COMMUNICATE: move towards soldier ---------LALALALLALALALALALALLALALAA");
             System.err.println(nearbySoldier);
             moveToSoldier = false;
             if (nearbySoldier.x != 0 || nearbySoldier.y != 0) return nearbySoldier; //{calculatePath(); return nearbySoldier;}

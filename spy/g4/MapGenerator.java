@@ -27,7 +27,8 @@ public class MapGenerator implements spy.sim.MapGenerator {
 		Random rand = new Random();
 		int p = rand.nextInt(3);
 		//PATH = path_p + paths.get(p);
-		PATH = "spy/g4/smallmap.txt";
+		//PATH = "spy/g4/smallmap.txt";
+		PATH = "spy/g4/smallmap_mud.txt";
 		//System.out.println("map path: " + PATH);
 
 		

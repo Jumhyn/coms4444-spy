@@ -172,7 +172,7 @@ public class Player implements spy.sim.Player {
     
     public List<Record> sendRecords(int id)
     {
-        System.err.println("> " + this.id + " SENDS to " + id + " <");
+        // System.err.println("> " + this.id + " SENDS to " + id + " <");
         ArrayList<Record> toSend = new ArrayList<Record>();
         for (ArrayList<Record> recarray : records) {
             for (Record ourRecord : recarray) {
@@ -185,13 +185,13 @@ public class Player implements spy.sim.Player {
                 }
             }
         }
-        System.err.println("length of records to send = " + toSend.size());
+        // System.err.println("length of records to send = " + toSend.size());
         return toSend;
     }
     
     public void receiveRecords(int id, List<Record> records)
     {
-        System.err.println("> " + this.id + " RECEIVES from " + id + " <");
+        // System.err.println("> " + this.id + " RECEIVES from " + id + " <");
 
         recordsReceived = true;
 
@@ -202,7 +202,7 @@ public class Player implements spy.sim.Player {
                 if (r!=null) {numRecs += 1;}
             }
         }
-        System.err.println("< initial length of records = " + numRecs);
+        // System.err.println("< initial length of records = " + numRecs);
         for (Record recR : records) {
 
             if (recR != null) {
@@ -226,7 +226,7 @@ public class Player implements spy.sim.Player {
                 if (r!=null) {numRecs += 1;}
             }
         }
-        System.err.println(">>>> new length of records = " + numRecs);
+        // System.err.println(">>>> new length of records = " + numRecs);
 
         lastPlayerComm = id;
 
@@ -279,7 +279,7 @@ public class Player implements spy.sim.Player {
         // ### Quincy's code here ###
         // ##########################
 
-        System.err.println("###########CALCPATH###########################################");
+        System.err.println("###########  calculating path ###############################");
 
         List<Point> finalPath = new ArrayList<Point>();
 
@@ -301,11 +301,13 @@ public class Player implements spy.sim.Player {
         for (Point key : trueRecords.keySet()) {
             int pt = trueRecords.get(key).getPT();
             if (pt == 1) { /* package location */
-                System.err.println("Found pac");
+                System.out.println("G4" + " ID: " + this.id);                
+                System.err.println("I FOUND PACKAGE LOCATION");
                 pac = key;
             }
             if (pt == 2) { /* target location */
-                System.err.println("Found tar");
+                System.out.println("G4" + " ID: " + this.id);
+                System.err.println("I FOUND TARGET LOCATION");
                 tar = key;
             }
             if (tar != null && pac != null) {
@@ -313,11 +315,11 @@ public class Player implements spy.sim.Player {
             }
         }
 
-        if(tar == null || pac == null) {
+        if(tar == null || pac == null) { // don't do anything if we don't know it obviously
             pathKnown = false;
             //System.err.println(targetKnown);
             //System.err.println(packageKnown);
-            System.err.println("# Package / target unknown #####################################################\n");
+            // System.err.println("# Package / target unknown #####################################################\n");
             return null;
         }
 
@@ -447,7 +449,7 @@ public class Player implements spy.sim.Player {
         } else {
             System.err.println("finalPath is null");
         }
-        System.err.println("###########END###########################################\n");
+        // System.err.println("###########END###########################################\n");
 
         return finalPath;
     }
@@ -457,7 +459,7 @@ public class Player implements spy.sim.Player {
         // ### Quincy's code here ###
         // ##########################
 
-        System.err.println("###########LOC - CALCPATH###########################################");
+        // System.err.println("###########LOC - CALCPATH###########################################");
 
         Queue<Point> finalPath = new LinkedList<Point>();
 
@@ -644,7 +646,7 @@ public class Player implements spy.sim.Player {
         } else {
             System.err.println("finalPath is null");
         }
-        System.err.println("###########END###########################################\n");
+        // System.err.println("###########END###########################################\n");
 
         return finalPath;
     }
@@ -668,7 +670,7 @@ public class Player implements spy.sim.Player {
                 toReturn.add(entry.getKey()); // 
             } 
         }
-        System.out.println(toReturn);
+        System.out.println("player " + this.id + "voting for " + toReturn);
         return toReturn;
     }
 
@@ -729,14 +731,14 @@ public class Player implements spy.sim.Player {
         if ((pathKnown) && (previousStatuses.get(this.loc).getPT() == 1)) {
 
             //calculatePath();
-            System.err.println(this.id + " waitingAtPackage (1) " + this.loc);
+            System.err.println(this.id + " ALREADY AT PACKAGE....WAITING..... " + this.loc);
             stayPut = false;
             moveToSoldier = false;
             return new Point(0, 0);
 
         } else if (pathKnown) {
             
-            System.err.println(this.id + " movement for KNOWN PATH pathToPackage size: " + pathToPackage.size());
+            System.err.println("SINCE PATH IS KNOWN, soldier " + this.id + "moving to package. Path size currently : " + pathToPackage.size());
             System.err.print(this.id + ": ");
             for (Point i : pathToPackage) {
                 System.err.print(i.toString());
@@ -745,11 +747,11 @@ public class Player implements spy.sim.Player {
             // move to the package
             if ((pathToPackage != null) && (!pathToPackage.isEmpty())) {
                 //movingToPackage = true;
-                System.err.println(this.id + " moving to package");
+                System.err.println(this.id + " MOVING TO PACKGE");
                 stayPut = false;
                 moveToSoldier = false;
                 Point newP = pathToPackage.remove();
-                System.err.println(this.id + " move to point: " + new Point(newP.x - this.loc.x, newP.y - this.loc.y));
+                // System.err.println(this.id + " move to point: " + new Point(newP.x - this.loc.x, newP.y - this.loc.y));
                 return new Point(newP.x - this.loc.x, newP.y - this.loc.y);
 
 
@@ -768,7 +770,7 @@ public class Player implements spy.sim.Player {
             stayPut = false;
             moveToSoldier = false;
             
-            System.err.println(this.id + " movement for KNOWN PACKAGE or TARGET");
+            // System.err.println("Soldier ID " + this.id + " movement for KNOWN PACKAGE or TARGET");
             winningPath = calculatePath();
             return moves.get(0).nextMove();
         
@@ -776,7 +778,7 @@ public class Player implements spy.sim.Player {
 
         if (stayPut) {
             // stay put for 2 time counts
-            System.err.println(this.id + " stay put");
+            // System.err.println(this.id + " stay put");
             if ((stayPutCounts < maxWaitTime) && (!recordsReceived)) {
                 ++stayPutCounts;
                 //calculatePath();
@@ -788,7 +790,7 @@ public class Player implements spy.sim.Player {
 
         if (moveToSoldier) {
             // move in the direction of a soldier
-            System.err.println(this.id + " move to soldier");
+            System.err.println(this.id + " LET'S COMMUNICATE: move to soldier");
             System.err.println(nearbySoldier);
             moveToSoldier = false;
             if (nearbySoldier.x != 0 || nearbySoldier.y != 0) return nearbySoldier; //{calculatePath(); return nearbySoldier;}
@@ -797,7 +799,7 @@ public class Player implements spy.sim.Player {
         stayPut = false;
         moveToSoldier = false;
 
-        System.err.println(this.id + " movement for EXPLORATION");
+        System.err.println(this.id + " EXPLORATION MOVE");
 
         // Explore randomly
         System.err.println("moves: " + moves.size());

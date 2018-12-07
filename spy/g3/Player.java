@@ -53,12 +53,21 @@ public class Player implements spy.sim.Player {
     private Point unexplored; // the next unexplored point to visit
 
     // Handles communicatin protocol
-    private HashMap<Point, CellStatus> lastObservation;	
-    private Boolean moveToSoldier;
-    private Boolean stayStill;
-    private HashMap<Integer, Point> nearbySoldiers;
-    private int idleCount = 4;
-	 
+    private HashMap<Point, CellStatus> lastObservation; 
+    private Boolean moveToSoldier = false;
+    private Boolean stayStill = false;
+    private int targetPeer = -1;
+    private HashMap <Integer, Point> nearbySoldiers;
+    private HashMap <Integer, Integer> notSeenCount; // Stores number of rounds since last encountering a player
+    private int idleCount = 0; // Counter to track idle rounds
+    private int followCount = 0; // Counter to track rounds following same communication target
+    private int maxCount = 4; // Only approach/wait for target peer for maxCount turns before disregarding communication
+    private int minGraceTime = 25; // Minimum count needed to allow communication protocol
+    private Boolean send_rec;
+
+    private int sendCount = 0;
+    private int recCount = 0;
+     
     private ArrayList<Point> wayPoints;
 
     private ArrayList<ArrayList<Record>> landInfo; // similar to 'records' but global for dry land claims
@@ -68,7 +77,7 @@ public class Player implements spy.sim.Player {
     {
         // Initialize parameters
 
-	    this._package=false;
+        this._package=false;
         this._target = false;
         this.grid = new int[100][100];
         this.visited = new int[100][100];
@@ -82,9 +91,17 @@ public class Player implements spy.sim.Player {
 
         this.wayPoints = new ArrayList<Point>();
 
-	lastObservation = new HashMap<Point, CellStatus>();
-        // set status of water cells and set unknown cells to muddy
+        // Keep reference of recent obeservation (referenced during getMove call)
+        this.lastObservation = new HashMap<Point, CellStatus>();
+        this.send_rec = false;
 
+        // Initialize notSeenCount to minGraceTime to initially allow communication with any player
+        this.notSeenCount = new HashMap<Integer, Integer>();
+        for (int i=0 ; i < n; i++) {
+            this.notSeenCount.put(i, minGraceTime);
+        }
+
+        // set status of water cells and set unknown cells to muddy
         for(int i=0;i<100;i++)
         {
             for(int j=0;j<100;j++)
@@ -100,7 +117,7 @@ public class Player implements spy.sim.Player {
             visited[tmp.x][tmp.y]= -2;
             grid[tmp.x][tmp.y] = -2;
         }
-	
+    
         // create records for sending and bookeeping
         this.id = id;
         this.records = new ArrayList<ArrayList<Record>>();
@@ -111,7 +128,7 @@ public class Player implements spy.sim.Player {
             {
                 row.add(null);
             }
-	    // System.out.println(row);
+        // System.out.println(row);
             this.records.add(row);
         }
     }
@@ -120,12 +137,12 @@ public class Player implements spy.sim.Player {
     // Adds observations to record
     public void observe(Point loc, HashMap<Point, CellStatus> statuses)
     {
-	// Store the current observation for reference in next move command
-	lastObservation = statuses;
+        // Store the current observation for reference in next move command
+        lastObservation = statuses;
 
         this.loc = loc;
         visited[loc.x][loc.y] = 1;
-	// System.out.println("Called observe function =========");
+        // System.out.println("Called observe function =========");
         for (Map.Entry<Point, CellStatus> entry : statuses.entrySet())
         {
             Point p = entry.getKey();
@@ -157,7 +174,7 @@ public class Player implements spy.sim.Player {
                 target_Location.y = p.y;
                 _target =true;
             }
-	        // System.out.println(p + " " + status + " " );
+            // System.out.println(p + " " + status + " " );
             if (record == null || record.getC() != status.getC() || record.getPT() != status.getPT())
             {
                 ArrayList<Observation> observations = new ArrayList<Observation>();
@@ -171,19 +188,36 @@ public class Player implements spy.sim.Player {
     //Sends records when demanded
     public List<Record> sendRecords(int id)
     {
-        // System.out.println("Called sendRecords ======");	  
+        this.sendCount++;
+        // Mark that player has been been communicated with recently
+        this.notSeenCount.put(id, 0);
+        // System.out.println("Called sendRecords ======");   
         ArrayList<Record> toSend = new ArrayList<Record>();
-        if(time%50==0)
-        for (ArrayList<Record> row : records)
+
+        if(loc!=null)
         {
-            for (Record record : row)
+            CellStatus cs = lastObservation.get(loc);
+            if(cs.getPresentSoldiers().size() > 1 && this.send_rec)
             {
-                if (record != null)
+                for (ArrayList<Record> row : records)
                 {
-                    toSend.add(record);
-                }
+                    for (Record record : row)
+                    {
+                        if (record != null)
+                        {
+                            toSend.add(record);
+                        }
+                    }
+                 }
+
+                 unexplored = getRandomUnexplored();
+                 this.send_rec = false;
+
             }
+            
+
         }
+        
         return toSend;
     }
     
@@ -192,20 +226,23 @@ public class Player implements spy.sim.Player {
     // Will have to change in presence of spy
     public void receiveRecords(int id, List<Record> records)
     {
-	   // System.out.println("Called receiveRecords Command ========");
-       for(int i=0;i<records.size();i++)
-       {
-         Record new_record = records.get(i);
-         Point p = new_record.getLoc();
-         Record curr_record = this.records.get(p.x).get(p.y);
+        this.recCount++;
+       // Mark that player has been been communicated with recently
+        this.notSeenCount.put(id, 0);   
 
-         visited[p.x][p.y] = 1;  // to be changed in case of spy
+        for(int i=0;i<records.size();i++)
+        {
+            Record new_record = records.get(i);
+            Point p = new_record.getLoc();
+            Record curr_record = this.records.get(p.x).get(p.y);
 
-         if(new_record.getC()==0)
+            visited[p.x][p.y] = 1;  // to be changed in case of spy
+
+            if(new_record.getC()==0)
             {
                 grid[p.x][p.y] = 0;    
             }
-         else if(new_record.getC()==1)
+            else if(new_record.getC()==1)
             {
                 grid[p.x][p.y] = -1;
             }
@@ -225,17 +262,17 @@ public class Player implements spy.sim.Player {
                 _target =true;
             }
 
-          if(curr_record==null)
-          {
+            if(curr_record==null)
+            {
             curr_record = new Record(new_record);
             this.records.get(p.x).set(p.y, curr_record);
 
             } 
 
-           else
+            else
             curr_record.getObservations().add(new Observation(this.id, Simulator.getElapsedT()));
 
-       }
+        }
 
     }
     
@@ -263,7 +300,7 @@ public class Player implements spy.sim.Player {
     // No idea what this is for
     public void receiveResults(HashMap<Integer, Integer> results)
     {
-       	// System.out.println("Called receiveResults Command =======");
+        // System.out.println("Called receiveResults Command ======= " + recCount + " and " + sendCount);
     }
 
     private void setWayPoints()
@@ -287,8 +324,6 @@ public class Player implements spy.sim.Player {
         wayPoints.add(wp6);
         wayPoints.add(wp7);
         wayPoints.add(wp8);
-
-
     }
 
 
@@ -442,77 +477,129 @@ public class Player implements spy.sim.Player {
     }
 
     public String getOrientation(Point me, Point other){
+        String orientation = "same point";
+        int yDiff = me.y - other.y;
+        if (yDiff > 0) {
+            orientation = "n";
+        } else if (yDiff <0 ){
+            orientation = "s";
+        } else {
+            orientation = "";
+        }
 
-	String orientation = "same point";
-	int yDiff = me.y - other.y;
-	if (yDiff > 0) {
-	    orientation = "n";
-	} else if (yDiff <0 ){
-	    orientation = "s";
-	} else {
-	    orientation = "";
-	}
+        int xDiff = me.x - other.x;
+        if (xDiff > 0) {
+            orientation = orientation + "e";
+        } else if (xDiff < 0) {
+            orientation = orientation + "w";
+        }
 
-	int xDiff = me.x - other.x;
-	if (xDiff > 0) {
-	    orientation = orientation + "e";
-	} else if (xDiff < 0) {
-	    orientation = orientation + "w";
-	}
-
-	return orientation;
+        return orientation;
     }
     //Computes the next move    
     public Point getMove()
     {
-
-    stayStill = false;
-    moveToSoldier = false;
     time++;
-    
+
+    // Increment not seen counts of all peers by 1
+    for (int i : notSeenCount.keySet()) {
+        this.notSeenCount.put(i, this.notSeenCount.get(i) + 1);
+    }
 
     visited[loc.x][loc.y] = 1; //mark current location as visited
-	// System.out.println("Called getMove Command =======");
     Point move = new Point(-1000,-1000);
 
 
-    // Communication protocol, check if soldier is near
- //    nearbySoldiers = new HashMap<Integer, Point>();
- //    for (Point p: lastObservation.keySet()) {
-	// CellStatus cs = lastObservation.get(p);
-	
-	// Point posToMove = new Point(0, 0);
-	// if ((cs.getPresentSoldiers().size() > 0) && (!p.equals(this.loc))) {
-		
-	//     for (int peerID : cs.getPresentSoldiers()) 
- //        {
-	// 	  nearbySoldiers.put(peerID, p);
+    // Communication protocol, check if soldier is near (HashMap cleared every round)
+    // Add soldiers in range to this HashMap
+    nearbySoldiers = new HashMap<Integer, Point>();
 
-	// 	  String myOrientation = getOrientation(this.loc, p);		
-	// 	  System.out.println(this.id + " Spotted soldier: " + peerID + " at location " + p + "=================================");
-	//            System.out.println("We are " + myOrientation + " of :" + peerID);
-		
-	// 	  posToMove = p;
-	// 	  if (myOrientation.equals("nw") || myOrientation.equals("n") || myOrientation.equals("w") ) {
-	// 	      stayStill = true;
-	// 	  } 
- //        else 
- //            {
-	// 	      moveToSoldier = true;
-	// 	      }
-	//        }
- //        }
+    // Iterate through recent observation radius points and get nearby peers
+    for (Point p: lastObservation.keySet()) {
+        CellStatus cs = lastObservation.get(p);
+        
+        if ((cs.getPresentSoldiers().size() > 0) && (!p.equals(this.loc))) {
+            
+            // Add all in-range players to nearbySoldiers HashMap
+            for (int peerID : cs.getPresentSoldiers()) 
+            {
+                // Only consider eligible soldiers (Have not been recently contacted)
+                if (notSeenCount.get(peerID) > minGraceTime) {
+                    nearbySoldiers.put(peerID, p);
+                }
+                System.out.println(this.id + " Spotted soldier: " + peerID + " at location " + p + "=================================");
+            }
+        }
+    }
 
-	// if (moveToSoldier) {
-	//     return getNextOnPath(this.loc, posToMove, false);
-	// }
-	
-	// if (stayStill && idleCount > 0) {
-	//     idleCount--;
-	//     return new Point(0, 0);		
-	// }
+    // Discern lowest ID player in vicinity
+    int minID = 99999;
+    for (int peerID : nearbySoldiers.keySet()) {
+        if ( peerID < minID ) {
+            minID = peerID;
+            this.send_rec = true;
+        }
+    }
 
- //    }
+    // No soldier in range
+    if (minID == 99999) {
+        idleCount = 0;
+        followCount = 0;
+        this.send_rec = false;
+    // Soldiers near, use communication protocol
+    } else {
+        // Detect new targetPeer
+        if (targetPeer == -1) {
+            targetPeer = minID;
+            idleCount = 0; 
+            followCount = 0;
+        // Detect if targetPeer remained the same as last round
+        } else if (targetPeer == minID) {
+            followCount++;
+            idleCount++;
+        // Update to new move/wait target 
+        } else {
+            targetPeer = minID;
+            // Allow idle time for player to approach/be contacted
+            idleCount = 0;
+            followCount = 0;
+        }
+
+        Point posToMove = new Point(0, 0);
+
+        if (targetPeer < this.id) {
+            moveToSoldier = true;
+            posToMove = nearbySoldiers.get(minID);
+
+            stayStill = false;
+        } else {
+            stayStill = true;
+            moveToSoldier = false;
+        }
+
+        // Move towards lowest ID player in range
+        if (moveToSoldier && (followCount < maxCount) && !found_path ) {
+            return getNextOnPath(this.loc, posToMove, false);
+        } else if (moveToSoldier && (followCount >= maxCount) )  {
+            followCount = 0;
+            targetPeer = -1;
+            // May want to add following line if constantly chasing same player
+            // (Other player is not following protocol)
+            this.notSeenCount.put(targetPeer, 0);
+        }
+
+        // Wait to be contacted for maxCount turns 
+        if (stayStill && (idleCount < maxCount) && !found_path) {
+            return new Point(0, 0);     
+        } else if (stayStill && (idleCount >= maxCount) ) {
+            idleCount = 0;
+            targetPeer = -1;
+            // May want to add following line if constantly chasing same player
+            // (Other player is not following protocol)
+            this.notSeenCount.put(targetPeer, 0);
+        }
+        
+    }
 
     //
     // If target and package have been located, try to find a safe path between them. If found set found_path to true
@@ -527,17 +614,27 @@ public class Player implements spy.sim.Player {
             Point start = package_Location;
             getNextOnPath(start,target_Location,true);
 
+            if(proposedPath.size()>1)
+
+            {
+                Point reach_pt = proposedPath.get(proposedPath.size()-1);
+            Point next_pt = proposedPath.get(0);
+
             proposedPath.add(0,start);
 
-            Point reach_pt = proposedPath.get(proposedPath.size()-1);
+            int diff = Math.abs(Math.abs(start.x - next_pt.x) - Math.abs(start.y - next_pt.y));
 
-            if(reach_pt.x==target_Location.x && reach_pt.y == target_Location.y)
+            if(reach_pt.x==target_Location.x && reach_pt.y == target_Location.y && diff<=1)
+               { 
                 found_path = true;
+                System.out.println("--------------------------------package at location:" + package_Location + " target at location " + target_Location + " proposed path is ----------------------------------------");
+                    for(int i=0;i<proposedPath.size();i++)
+                    {
+                        System.out.println(proposedPath.get(i));
+                    }
+               }
+        }
             
-            for(int i=0;i<proposedPath.size();i++)
-            {
-                System.out.println(proposedPath.get(i));
-            }
         }
         //announce shortest path
     }

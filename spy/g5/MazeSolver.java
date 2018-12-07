@@ -238,4 +238,56 @@ public class MazeSolver
         path.add(start);
         Collections.reverse(path);
     }
+
+    public void bushwhack()
+    {
+	
+   	Point current = null;
+        List<Point> explore = new ArrayList<Point>();
+        explore.add(start);
+	
+        while (current == null || current.x != this.end.x || current.y != this.end.y)
+        {
+        	if(explore.size() == 0) 
+        	{
+        		return; //no path is known
+        	}
+        	else 
+        	{
+        		current = explore.get(0);
+        		explore.remove(0);   
+        	}
+	    
+        	for(List<Integer> offset: offsets)
+        	{
+        		// if cell is in grid, not mud or water and parent is not set
+        		Point adjacent = new Point(current.x+offset.get(0), current.y+offset.get(1));
+        		if(adjacent.x >=0 && adjacent.x < 100 && adjacent.y >=0 && adjacent.y < 100) 
+        		{
+        			if(parents.get(adjacent.x).get(adjacent.y) == null)
+        			{
+				    if (maze.get(adjacent.x).get(adjacent.y) == null || maze.get(adjacent.x).get(adjacent.y).getC() != 2)
+        				{
+        					// set parent as current
+        					// append cell to explore list (unless cell == end, then add to front of list)
+        					parents.get(adjacent.x).set(adjacent.y, new Point( current.x, current.y ));
+        					explore.add(adjacent);
+        				}
+        			}
+        		}
+        	}
+        }
+        path = new ArrayList<Point>();
+        while(current.x != start.x || current.y != start.y) 
+        {
+        	path.add(current);
+        	current = parents.get(current.x).get(current.y);
+        }
+        path.add(start);
+        Collections.reverse(path);
+    }
+
+    
 }
+
+

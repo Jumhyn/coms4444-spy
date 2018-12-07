@@ -38,6 +38,7 @@ public class Player implements spy.sim.Player {
     
     private ArrayList<ArrayList<Record>> records; // 2-dim list of cells on map (personal records)
     private int id;
+    private boolean isSpy;
     private Point loc; // Current location on map
     private Boolean _target;  // whether target has been located
     private Boolean _package; //whether package has been located
@@ -104,6 +105,7 @@ public class Player implements spy.sim.Player {
         this.trap_count =  new HashMap<Point,Integer>();
         this.time =0;
         this.unexplored = getRandomUnexplored();
+        this.isSpy = isSpy;
 
         this.wayPoints = new ArrayList<Point>();
         this.suspects = new ArrayList<Integer>();
@@ -373,8 +375,31 @@ public class Player implements spy.sim.Player {
     //Proposes the path if on package location
     public List<Point> proposePath()
     {
-        if(proposedPath.size()>1)
-            return proposedPath;
+        //if (proposedPath.size()>1)
+        //{
+        //    System.out.println(proposedPath);
+        //    return proposedPath;
+        //}
+        if (!this.isSpy)
+        {
+            if(proposedPath.size()>1)
+            {
+                return proposedPath;
+            }
+        }
+        else
+        {
+            List<Point> badPath = new ArrayList<Point>();
+            for (int i = 0; i < proposedPath.size(); i++)
+            {
+                if (i != proposedPath.size() - 2)
+                {
+                    badPath.add(proposedPath.get(i));
+                }
+            }
+            System.out.println(badPath);
+            return badPath;
+        }
         return null;
     }
     
@@ -382,13 +407,72 @@ public class Player implements spy.sim.Player {
     //NOTE: Currently trusting all paths proposed by the players. Assuming the correctness of their implementations
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        ArrayList<Integer> toReturn = new ArrayList<Integer>();
+
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
         {
-            ArrayList<Integer> toReturn = new ArrayList<Integer>();
-            toReturn.add(entry.getKey());
+            int _id = entry.getKey();
+            List<Point> _path = entry.getValue();
+            if (isValidPath(_path) && !this.isSpy)
+            {
+                toReturn.add(_id);
+            }
             return toReturn;
         }
         return null;
+    }
+
+    public Boolean isValidPath(List<Point> _path)
+    {
+        int _path_size = _path.size();
+
+        Point prev = _path.get(0);
+        Point next;
+        Record record;
+        int status;
+        for (int i = 0; i < _path_size; i++)
+        {
+            next = _path.get(i);
+            record = records.get(next.x).get(next.y);
+            status = record.getPT();
+
+            if (i == 0)
+            {
+                // check first cell is the package location
+                if (status != 1)
+                {
+                    //System.out.println("FAIL1");
+                    return false;
+                }
+            }
+            else if (i == _path_size - 1)
+            {
+                // check last cell is the target location 
+                if (status != 2)
+                {
+                    //System.out.println("FAIL2");
+                    return false;
+                }
+            }
+            else
+            {
+                // check all other cells is clear
+                if (status != 0)
+                {
+                    //System.out.println("FAIL3");
+                    return false;
+                }
+            }
+
+            if ((Math.abs(next.x - prev.x) > 1) || (Math.abs(next.y - prev.y) > 1))
+            {
+                // check it's actually a path
+                //System.out.println("FAIL4");
+                return false;
+            }    
+            prev = next;
+        }
+        return true;
     }
     
     // No idea what this is for
@@ -537,8 +621,8 @@ public class Player implements spy.sim.Player {
                         if(destination.x == i && destination.y ==j)
                            {
                             found =true;
-                            System.out.println("location is  " + loc + " destination is " + destination);
-                            System.out.println("found the destination at distance "  + val);
+                            //System.out.println("location is  " + loc + " destination is " + destination);
+                            //System.out.println("found the destination at distance "  + val);
                         }
 
                              
@@ -556,7 +640,7 @@ public class Player implements spy.sim.Player {
 
             while(parent.get(next)!=null)
             {
-                System.out.println(next);
+                //System.out.println(next);
                 prev = new Point(next.x,next.y);
                 if(!found_path)
                 proposedPath.add(0,new Point(prev.x,prev.y));
@@ -564,7 +648,7 @@ public class Player implements spy.sim.Player {
                 
             }
 
-            System.out.println("next move point is "  + prev);
+            //System.out.println("next move point is "  + prev);
             return prev;
 
 
@@ -591,231 +675,230 @@ public class Player implements spy.sim.Player {
         return orientation;
     }
     //Computes the next move    
-    public Point getMove()
-    {
-    time++;
+    public Point getMove(){
+        time++;
 
-    // Increment not seen counts of all peers by 1
-    for (int i : notSeenCount.keySet()) {
-        this.notSeenCount.put(i, this.notSeenCount.get(i) + 1);
-    }
+        // Increment not seen counts of all peers by 1
+        for (int i : notSeenCount.keySet()) {
+            this.notSeenCount.put(i, this.notSeenCount.get(i) + 1);
+        }
 
-    visited[loc.x][loc.y] = 1; //mark current location as visited
-    Point move = new Point(-1000,-1000);
+        visited[loc.x][loc.y] = 1; //mark current location as visited
+        Point move = new Point(-1000,-1000);
 
 
-    // Communication protocol, check if soldier is near (HashMap cleared every round)
-    // Add soldiers in range to this HashMap
-    nearbySoldiers = new HashMap<Integer, Point>();
+        // Communication protocol, check if soldier is near (HashMap cleared every round)
+        // Add soldiers in range to this HashMap
+        nearbySoldiers = new HashMap<Integer, Point>();
 
-    // Iterate through recent observation radius points and get nearby peers
-    for (Point p: lastObservation.keySet()) {
-        CellStatus cs = lastObservation.get(p);
-        
-        if ((cs.getPresentSoldiers().size() > 0) && (!p.equals(this.loc))) {
+        // Iterate through recent observation radius points and get nearby peers
+        for (Point p: lastObservation.keySet()) {
+            CellStatus cs = lastObservation.get(p);
             
-            // Add all in-range players to nearbySoldiers HashMap
-            for (int peerID : cs.getPresentSoldiers()) 
-            {
-                // Only consider eligible soldiers (Have not been recently contacted)
-                if (notSeenCount.get(peerID) > minGraceTime) {
-                    nearbySoldiers.put(peerID, p);
+            if ((cs.getPresentSoldiers().size() > 0) && (!p.equals(this.loc))) {
+                
+                // Add all in-range players to nearbySoldiers HashMap
+                for (int peerID : cs.getPresentSoldiers()) 
+                {
+                    // Only consider eligible soldiers (Have not been recently contacted)
+                    if (notSeenCount.get(peerID) > minGraceTime) {
+                        nearbySoldiers.put(peerID, p);
+                    }
+                    //System.out.println(this.id + " Spotted soldier: " + peerID + " at location " + p + "=================================");
                 }
-                System.out.println(this.id + " Spotted soldier: " + peerID + " at location " + p + "=================================");
             }
         }
-    }
 
-    // Discern lowest ID player in vicinity
-    int minID = 99999;
-    for (int peerID : nearbySoldiers.keySet()) {
-        if ( peerID < minID ) {
-            minID = peerID;
-            this.send_rec = true;
+        // Discern lowest ID player in vicinity
+        int minID = 99999;
+        for (int peerID : nearbySoldiers.keySet()) {
+            if ( peerID < minID ) {
+                minID = peerID;
+                this.send_rec = true;
+            }
         }
-    }
 
-    // No soldier in range
-    if (minID == 99999) {
-        idleCount = 0;
-        followCount = 0;
-        this.send_rec = false;
-    // Soldiers near, use communication protocol
-    } else {
-        // Detect new targetPeer
-        if (targetPeer == -1) {
-            targetPeer = minID;
-            idleCount = 0; 
-            followCount = 0;
-        // Detect if targetPeer remained the same as last round
-        } else if (targetPeer == minID) {
-            followCount++;
-            idleCount++;
-        // Update to new move/wait target 
-        } else {
-            targetPeer = minID;
-            // Allow idle time for player to approach/be contacted
+        // No soldier in range
+        if (minID == 99999) {
             idleCount = 0;
             followCount = 0;
-        }
-
-        Point posToMove = new Point(0, 0);
-
-        if (targetPeer < this.id) {
-            moveToSoldier = true;
-            posToMove = nearbySoldiers.get(minID);
-
-            stayStill = false;
+            this.send_rec = false;
+        // Soldiers near, use communication protocol
         } else {
-            stayStill = true;
-            moveToSoldier = false;
+            // Detect new targetPeer
+            if (targetPeer == -1) {
+                targetPeer = minID;
+                idleCount = 0; 
+                followCount = 0;
+            // Detect if targetPeer remained the same as last round
+            } else if (targetPeer == minID) {
+                followCount++;
+                idleCount++;
+            // Update to new move/wait target 
+            } else {
+                targetPeer = minID;
+                // Allow idle time for player to approach/be contacted
+                idleCount = 0;
+                followCount = 0;
+            }
+
+            Point posToMove = new Point(0, 0);
+
+            if (targetPeer < this.id) {
+                moveToSoldier = true;
+                posToMove = nearbySoldiers.get(minID);
+
+                stayStill = false;
+            } else {
+                stayStill = true;
+                moveToSoldier = false;
+            }
+
+            // Move towards lowest ID player in range
+            if (moveToSoldier && (followCount < maxCount) && !found_path ) {
+                return getNextOnPath(this.loc, posToMove, false);
+            } else if (moveToSoldier && (followCount >= maxCount) )  {
+                followCount = 0;
+                targetPeer = -1;
+                // May want to add following line if constantly chasing same player
+                // (Other player is not following protocol)
+                this.notSeenCount.put(targetPeer, 0);
+            }
+
+            // Wait to be contacted for maxCount turns 
+            if (stayStill && (idleCount < maxCount) && !found_path) {
+                return new Point(0, 0);     
+            } else if (stayStill && (idleCount >= maxCount) ) {
+                idleCount = 0;
+                targetPeer = -1;
+                // May want to add following line if constantly chasing same player
+                // (Other player is not following protocol)
+                this.notSeenCount.put(targetPeer, 0);
+            }
+            
         }
 
-        // Move towards lowest ID player in range
-        if (moveToSoldier && (followCount < maxCount) && !found_path ) {
-            return getNextOnPath(this.loc, posToMove, false);
-        } else if (moveToSoldier && (followCount >= maxCount) )  {
-            followCount = 0;
-            targetPeer = -1;
-            // May want to add following line if constantly chasing same player
-            // (Other player is not following protocol)
-            this.notSeenCount.put(targetPeer, 0);
-        }
-
-        // Wait to be contacted for maxCount turns 
-        if (stayStill && (idleCount < maxCount) && !found_path) {
-            return new Point(0, 0);     
-        } else if (stayStill && (idleCount >= maxCount) ) {
-            idleCount = 0;
-            targetPeer = -1;
-            // May want to add following line if constantly chasing same player
-            // (Other player is not following protocol)
-            this.notSeenCount.put(targetPeer, 0);
-        }
-        
-    }
-
-    //
-    // If target and package have been located, try to find a safe path between them. If found set found_path to true
-    //
-    if(_target && _package)
-    {
-        //wait
-        if(!found_path)
+        //
+        // If target and package have been located, try to find a safe path between them. If found set found_path to true
+        //
+        if(_target && _package)
         {
-            proposedPath.clear();
-            
-            Point start = package_Location;
-            getNextOnPath(start,target_Location,true);
-
-            if(proposedPath.size()>1)
-
+            //wait
+            if(!found_path)
             {
-                Point reach_pt = proposedPath.get(proposedPath.size()-1);
-            Point next_pt = proposedPath.get(0);
+                proposedPath.clear();
+                
+                Point start = package_Location;
+                getNextOnPath(start,target_Location,true);
 
-            proposedPath.add(0,start);
+                if(proposedPath.size()>1)
 
-            int diff = Math.abs(Math.abs(start.x - next_pt.x) - Math.abs(start.y - next_pt.y));
+                {
+                    Point reach_pt = proposedPath.get(proposedPath.size()-1);
+                Point next_pt = proposedPath.get(0);
 
-            if(reach_pt.x==target_Location.x && reach_pt.y == target_Location.y && diff<=1)
-               { 
-                found_path = true;
-                System.out.println("--------------------------------package at location:" + package_Location + " target at location " + target_Location + " proposed path is ----------------------------------------");
-                    for(int i=0;i<proposedPath.size();i++)
-                    {
-                        System.out.println(proposedPath.get(i));
-                    }
-               }
+                proposedPath.add(0,start);
+
+                int diff = Math.abs(Math.abs(start.x - next_pt.x) - Math.abs(start.y - next_pt.y));
+
+                if(reach_pt.x==target_Location.x && reach_pt.y == target_Location.y && diff<=1)
+                   { 
+                    found_path = true;
+                    //System.out.println("--------------------------------package at location:" + package_Location + " target at location " + target_Location + " proposed path is ----------------------------------------");
+                        for(int i=0;i<proposedPath.size();i++)
+                        {
+                            //System.out.println(proposedPath.get(i));
+                        }
+                   }
+            }
+                
+            }
+            //announce shortest path
         }
+
+        //
+        // if a safe path has been found, proceed to the package on the shortest path from current location
+        //
+        if(_target && _package && found_path && (loc.x!=package_Location.x || loc.y!=package_Location.y))
+        {
+            //go to package
+            Point next = getNextOnPath(loc,package_Location,false);
+            move = next;
+            //System.out.println("location is " + loc + " moving to " + move );
+            int x  = move.x - loc.x;
+            int y = move.y - loc.y;
+
             
+            return new Point(x,y);
         }
-        //announce shortest path
-    }
+        //
+        //If safe path has been found from package to target and you are package location, then wait and announce proposed path.
+        //Also vote for appropriate paths
+        //
+        else if(_target && _package && found_path)
+        {
+            return new Point(0,0);
+        }
+        //
+        // If you are enroute to the next unexplored cell and haven't reached it then continue along the shortest path to that cell
+        //
+        if(unexplored.x>=0 && unexplored.y>=0 && visited[unexplored.x][unexplored.y]!=1)
+        {
+            Point next = getNextOnPath(loc,unexplored,false);
+                move = next;
+                int x  = move.x - loc.x;
+                int y = move.y - loc.y;
+                // System.out.println("moving to closest unexplored from " + loc + " moving to " + unexplored + "via "  + move );
+                // System.out.println("the cell condition for " + move +   " is  " + grid[move.x][move.y] );
 
-    //
-    // if a safe path has been found, proceed to the package on the shortest path from current location
-    //
-    if(_target && _package && found_path && (loc.x!=package_Location.x || loc.y!=package_Location.y))
-    {
-        //go to package
-        Point next = getNextOnPath(loc,package_Location,false);
-        move = next;
-        System.out.println("location is " + loc + " moving to " + move );
-        int x  = move.x - loc.x;
-        int y = move.y - loc.y;
+                if(x>=-1 && y>=-1)
+                return new Point(x,y);
+        }
+        //
+        //If you have reached the last unexplored cell, then find the next nearest unexplored cell. Set unexplored to next site
+        //
+        Point next_loc = getNearestUnExplored(loc);
+        unexplored = next_loc;
 
+        //
+        //get next move for new unexplored site
+        //
         
-        return new Point(x,y);
-    }
-    //
-    //If safe path has been found from package to target and you are package location, then wait and announce proposed path.
-    //Also vote for appropriate paths
-    //
-    else if(_target && _package && found_path)
-    {
-        return new Point(0,0);
-    }
-    //
-    // If you are enroute to the next unexplored cell and haven't reached it then continue along the shortest path to that cell
-    //
-    if(unexplored.x>=0 && unexplored.y>=0 && visited[unexplored.x][unexplored.y]!=1)
-    {
-        Point next = getNextOnPath(loc,unexplored,false);
+        Point next = getNextOnPath(loc,next_loc,false);
+
+        //
+        // maintain a trap count for current location
+        //
+        if(trap_count.containsKey(next))
+        {
+            trap_count.put(next,trap_count.get(next)+1);
+        }
+        else
+        {
+            trap_count.put(next,0);
+        }
+        //
+        //if you have visited the same site more than 10 times, then probably trapped. Select a random unexplored cell and proceed towards that to break free.
+        //
+        if(trap_count.get(next)<10)
+        {
             move = next;
             int x  = move.x - loc.x;
             int y = move.y - loc.y;
-            // System.out.println("moving to closest unexplored from " + loc + " moving to " + unexplored + "via "  + move );
-            // System.out.println("the cell condition for " + move +   " is  " + grid[move.x][move.y] );
+             if(x>=-1 && y>=-1)
+                return new Point(x,y);
+        }
+        else
+        {
+            unexplored = getRandomUnexplored();
+            move = getNextOnPath(loc,unexplored,false);
+                int x  = move.x - loc.x;
+                int y = move.y - loc.y;
 
-            if(x>=-1 && y>=-1)
-            return new Point(x,y);
-    }
-    //
-    //If you have reached the last unexplored cell, then find the next nearest unexplored cell. Set unexplored to next site
-    //
-    Point next_loc = getNearestUnExplored(loc);
-    unexplored = next_loc;
+                if(x>=-1 && y>=-1)
+                return new Point(x,y);
 
-    //
-    //get next move for new unexplored site
-    //
-    
-    Point next = getNextOnPath(loc,next_loc,false);
-
-    //
-    // maintain a trap count for current location
-    //
-    if(trap_count.containsKey(next))
-    {
-        trap_count.put(next,trap_count.get(next)+1);
-    }
-    else
-    {
-        trap_count.put(next,0);
-    }
-    //
-    //if you have visited the same site more than 10 times, then probably trapped. Select a random unexplored cell and proceed towards that to break free.
-    //
-    if(trap_count.get(next)<10)
-    {
-        move = next;
-        int x  = move.x - loc.x;
-        int y = move.y - loc.y;
-         if(x>=-1 && y>=-1)
-            return new Point(x,y);
-    }
-    else
-    {
-        unexplored = getRandomUnexplored();
-        move = getNextOnPath(loc,unexplored,false);
-            int x  = move.x - loc.x;
-            int y = move.y - loc.y;
-
-            if(x>=-1 && y>=-1)
-            return new Point(x,y);
-
-    }
+        }
 
         //
         //This basically should never happem. It implies that you visited all possible cells and still found no valid path!

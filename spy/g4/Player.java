@@ -335,7 +335,7 @@ public class Player implements spy.sim.Player {
 
         while (true) {
             /* dequeue and set to current */
-            System.err.println("while true at line 332");
+            // System.err.println("while true at line 332");
             if (queue.size() == 0 && goal_reached == false) {
                 break;
             }
@@ -513,7 +513,7 @@ public class Player implements spy.sim.Player {
 
         while (true) {
             /* dequeue and set to current */
-            System.err.println("while true at 510");
+            // System.err.println("while true at 510");
             if (queue.size() == 0 && goal_reached == false) {
                 break;
             }
@@ -659,14 +659,16 @@ public class Player implements spy.sim.Player {
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     { 
         // list of players we agree with 
+        System.out.println("\n*****************    getVotes() invoked     ******************\n ");
         ArrayList<Integer> toReturn = new ArrayList<Integer>(); 
-        for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
+        for (Map.Entry<Integer, List<Point>> entry : paths.entrySet()) // all the lists
         { 
             // if player proposed a valid path
             if (this.isValidPath(entry.getValue())) { 
-                toReturn.add(entry.getKey());
+                toReturn.add(entry.getKey()); // 
             } 
         }
+        System.out.println(toReturn);
         return toReturn;
     }
 
@@ -674,34 +676,40 @@ public class Player implements spy.sim.Player {
     // isValidPath() gets as input a proposed path from getVotes()
     // it returns a boolean, true if path is valid  
     private boolean isValidPath(List<Point> proposedPath) {
+
+        if (proposedPath.equals(winningPath)) { // if it's our own path
+            return true; 
+        }
+
         int f = proposedPath.size() - 1; 
         int i = 0;
         for (Point point : proposedPath) {
-            Record record = records.get(point.x).get(point.y);
+            Record record = records.get(point.x).get(point.y); // corresponding record 
             // matching record must exist and cell condition must be clear (0) 
-            if (record == null || record.getC() != 0) {
+            if (record == null || record.getC() != 0) { // must be clear 
                 return false;
             }
-            if (i == 0) {
+            if (i == 0) { // if clear check the type of cell 
                 // package location 
-                if (record.getPT() != 1) {
-                    //System.err.println(record.getPT());
-                    i++;
+                if (record.getPT() != 1) {  
+                    System.out.println(record.getPT());
                     return false;
+                } else {
+                    i++; // if it is package
                 }
             } else if (i == f) {
                 // target location 
-                if (record.getPT() != 2) {
-                    //System.err.println(record.getPT());
+                if (record.getPT() != 2) { // is not package
+                    System.err.println(record.getPT());
                     return false;
                 }
             } else {
                 // ordinary cell 
-                i++;
                 if (record.getPT() != 0) {
-                    //System.err.println(record.getPT());
+                    System.err.println(record.getPT());
                     return false; 
                 }
+                i++;
             }
         } // end of for loop
         return true; // if all passed 

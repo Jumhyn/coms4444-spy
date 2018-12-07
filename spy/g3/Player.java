@@ -243,7 +243,7 @@ public class Player implements spy.sim.Player {
         // Mark that player has been been communicated with recently
         this.notSeenCount.put(id, 0);
         // System.out.println("Called sendRecords ======");   
-        ArrayList<Record> toSend = new ArrayList<Record>();
+        List<Record> toSend = new ArrayList<Record>();
 
         if(loc!=null)
         {
@@ -268,8 +268,15 @@ public class Player implements spy.sim.Player {
             
 
         }
-        
-        return toSend;
+
+        if (!this.isSpy)
+        {
+            return toSend;
+        }
+        else
+        {
+            return toSend.subList(Math.max(0, toSend.size() - 49), toSend.size());
+        }
     }
     
     // receives records and updates grid &  visited according ro info provided.

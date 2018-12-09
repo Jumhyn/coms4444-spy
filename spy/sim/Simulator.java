@@ -28,43 +28,43 @@ import spy.sim.CellStatus;
 import spy.sim.HTTPServer;
 
 public class Simulator {
-    
+
     private static class InternalCellStatus implements CellStatus {
-        
+
         private int c;
         private int pt;
         public ArrayList<Integer> presentSoldiers;
-        
+
         public InternalCellStatus(int c, int pt, ArrayList<Integer> presentSoldiers)
         {
             this.c = c;
             this.pt = pt;
             this.presentSoldiers = presentSoldiers;
         }
-        
+
         public InternalCellStatus(InternalCellStatus other)
         {
             this.c = other.c;
             this.pt = other.pt;
             this.presentSoldiers = new ArrayList<Integer>(other.presentSoldiers);
         }
-        
+
         public int getC()
         {
             return this.c;
         }
-        
+
         public int getPT()
         {
             return pt;
         }
-        
+
         public ArrayList<Integer> getPresentSoldiers()
         {
             return presentSoldiers;
         }
     }
-    
+
     private static final String root = "spy";
     private static final String statics_root = "statics";
 
@@ -79,29 +79,30 @@ public class Simulator {
     private static String mapGenName;
     private static int seed = -1;
     private static Random rand;
-    
+
     private static ArrayList<PlayerWrapper> players;
     private static MapGenerator mapGen;
-    
+
     private static ArrayList<ArrayList<InternalCellStatus>> map;
-    
+
     private static ArrayList<Point> playerDestinations;
     private static ArrayList<Point> playerLocations;
     private static ArrayList<Integer> playerRemainingTravelTimes;
 
     private static ArrayList<Point> observableOffsets;
-    
+
     private static List<Point> waterCells;
     private static List<Point> muddyCells;
     private static Point targetLocation;
     private static Point packageLocation;
-    
+
     private static List<Point> finalPath;
     private static boolean victory;
 
     private static int spyID = -1;
+    private static String spyName = null;
     private static boolean noSpy = false;
-    
+
     public static void main(String[] args) throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
         parseArgs(args);
         num_players = playerNames.size();
@@ -123,7 +124,7 @@ public class Simulator {
             System.out.println("Player " + i + ": " + playerNames.get(i));
             Log.record("Player " + i + ": " + playerNames.get(i));
         }
-        
+
         if (seed == -1)
         {
             rand = new Random();
@@ -131,20 +132,24 @@ public class Simulator {
         {
             rand = new Random(seed);
         }
-        
+
         if (noSpy == false) {
-            if (spyID == -1) {
+            if (spyName == null) {
                 spyID = rand.nextInt(num_players);
+                spyID = shuffle.get(spyID);
             }
-            spyID = shuffle.get(spyID);
-            System.out.println("Player " + spyID + " is spy");
-            Log.record("Player " + spyID + " is spy");
+            else {
+                spyID = playerNames.indexOf(spyName);
+            }
+
+            System.out.println("Player " + playerNames.get(spyID) + " is spy");
+            Log.record("Player " + spyID + " " + playerNames.get(spyID) + " is spy");
         } else
         {
             Log.record("NO SPY!");
             spyID = -1;
         }
-        
+
         observableOffsets = new ArrayList<Point>();
         observableOffsets.add(new Point(0, -3));
         observableOffsets.add(new Point(-2, -2));
@@ -175,15 +180,15 @@ public class Simulator {
         observableOffsets.add(new Point(1, 2));
         observableOffsets.add(new Point(2, 2));
         observableOffsets.add(new Point(0, 3));
-        
+
         mapGen = loadMapGenerator(mapGenName);
-        
+
         waterCells = mapGen.waterCells();
         muddyCells = mapGen.muddyCells();
         packageLocation = mapGen.packageLocation();
         targetLocation = mapGen.targetLocation();
         List<Point> startingLocations = mapGen.startingLocations(waterCells);
-        
+
         map = new ArrayList<ArrayList<InternalCellStatus>>(100);
         for (int i = 0; i < 100; i++)
         {
@@ -199,7 +204,7 @@ public class Simulator {
                 map.get(i).add(status);
             }
         }
-        
+
         playerDestinations = new ArrayList<Point>();
         playerRemainingTravelTimes = new ArrayList<Integer>();
         playerLocations = new ArrayList<Point>();
@@ -211,7 +216,7 @@ public class Simulator {
             playerLocations.add(startingLoc);
             map.get(startingLoc.x).get(startingLoc.y).presentSoldiers.add(i);
         }
-        
+
         players = new ArrayList<PlayerWrapper>();
         try {
             for (String name : playerNames)
@@ -223,7 +228,7 @@ public class Simulator {
             System.out.println("Unable to load player. " + ex.getMessage());
             System.exit(0);
         }
-        
+
         finalPath = null;
 
         HTTPServer server = null;
@@ -241,15 +246,15 @@ public class Simulator {
                     e.printStackTrace();
                 }
             }
-            
+
             gui(server, state(fps));
         }
-        
+
         for (int i = 0; i < num_players; i++)
         {
             players.get(i).init(num_players, i, t, playerLocations.get(i), waterCells, i == spyID);
         }
-        
+
         victory = false;
         elapsedT = 0;
         while (elapsedT < t)
@@ -267,7 +272,7 @@ public class Simulator {
                 gui(server, state(fps));
             }
         }
-        
+
         if (victory)
         {
             System.out.println("\nEND: SUCCESS! Score: " + elapsedT);
@@ -286,14 +291,12 @@ public class Simulator {
 
         if (gui)
         {
-            gui(server, state(fps));
-            while (true)
-            {
-
-            }
+            gui(server, state(-1));
         }
+
+        System.exit(0);
     }
-    
+
     private static void handleMovement()
     {
         for (int i = 0; i < num_players; i++)
@@ -316,7 +319,7 @@ public class Simulator {
             }
         }
     }
-    
+
     private static void handleObservations()
     {
         for (int i = 0; i < num_players; i++)
@@ -330,13 +333,13 @@ public class Simulator {
                 {
                     continue;
                 }
-                
+
                 observations.put(loc, new InternalCellStatus(map.get(loc.x).get(loc.y)));
             }
             players.get(i).observe(playerLoc, observations);
         }
     }
-    
+
     private static void handleCommunication()
     {
         HashMap<Point, List<Record>> communications = new HashMap<Point, List<Record>>();
@@ -345,14 +348,14 @@ public class Simulator {
             for (int j = 0; j < num_players; j++)
             {
                 if (i == j) continue;
-                
+
                 Point player1Loc = playerLocations.get(i);
                 Point player2Loc = playerLocations.get(j);
                 if (!player1Loc.equals(player2Loc)) continue;
-                
+
                 List<Record> records = players.get(i).sendRecords(j);
                 if (records == null) records = new ArrayList<Record>();
-                
+
                 ArrayList<Record> copy = new ArrayList<Record>();
                 for (Record r : records)
                 {
@@ -361,83 +364,101 @@ public class Simulator {
                 communications.put(new Point(i, j), copy);
             }
         }
-        
+
         for (Map.Entry<Point, List<Record>> entry : communications.entrySet())
         {
             Point pair = entry.getKey();
             List<Record> records = entry.getValue();
-            
+
             players.get(pair.y).receiveRecords(pair.x, records);
         }
     }
-    
+
     private static int handlePathVoting()
     {
-        ArrayList<Integer> playersPresent = map.get(packageLocation.x).get(packageLocation.y).presentSoldiers;
-        if (playersPresent.size() < 3)
-        {
-            return 0;
-        }
-
-        HashMap<Integer, List<Point>> proposals = new HashMap<Integer, List<Point>>();
-        for (int i : playersPresent)
-        {
-            List<Point> proposal = players.get(i).proposePath();
-            if (proposal != null)
+        try {
+            ArrayList<Integer> playersPresent = map.get(packageLocation.x).get(packageLocation.y).presentSoldiers;
+            if (playersPresent.size() < 3)
             {
-                proposals.put(i, proposal);
+                return 0;
             }
-        }
-        
-        HashMap<Integer, Integer> results = new HashMap<Integer, Integer>();
-        HashMap<Integer, Integer> counts = new HashMap<Integer, Integer>();
-        for (int i : playersPresent)
-        {
-            List<Integer> votes = players.get(i).getVotes(proposals);
-            if (votes != null)
+
+            HashMap<Integer, List<Point>> proposals = new HashMap<Integer, List<Point>>();
+            System.out.print("Players voting: ");
+            for (int i : playersPresent) {
+                System.out.print(playerNames.get(i) + " ");
+            }
+
+            System.out.println();
+
+            for (int i : playersPresent)
             {
-                for (int vote : votes)
+                List<Point> proposal = players.get(i).proposePath();
+                if (proposal != null)
                 {
-                    if (proposals.get(vote) != null)
+                    proposals.put(i, proposal);
+                }
+            }
+
+            HashMap<Integer, Integer> results = new HashMap<Integer, Integer>();
+            HashMap<Integer, Integer> counts = new HashMap<Integer, Integer>();
+            for (int i : playersPresent)
+            {
+                List<Integer> votes = players.get(i).getVotes(proposals);
+                if (votes != null)
+                {
+                    for (int vote : votes)
                     {
-                        counts.put(vote, (counts.get(vote) == null) ? 1 : counts.get(vote) + 1);
-                        results.put(i, vote);
+                        if (proposals.get(vote) != null)
+                        {
+                            counts.put(vote, (counts.get(vote) == null) ? 1 : counts.get(vote) + 1);
+                            results.put(i, vote);
+                        }
                     }
                 }
             }
-        }
-        
-        List<Point> winningPath = null;
-        int maxCount = 2;
-        for (Map.Entry<Integer, Integer> entry : counts.entrySet())
-        {
-            if (entry.getValue() > maxCount)
+
+            List<Point> winningPath = null;
+            int maxCount = 2;
+            int proposer = -1;
+            for (Map.Entry<Integer, Integer> entry : counts.entrySet())
             {
-                maxCount = entry.getValue();
-                winningPath = proposals.get(entry.getKey());
+                if (entry.getValue() > maxCount)
+                {
+                    maxCount = entry.getValue();
+                    winningPath = proposals.get(entry.getKey());
+                    proposer = entry.getKey();
+                }
+                else if (entry.getValue() == maxCount)
+                {
+                    winningPath = null;
+                }
             }
-            else if (entry.getValue() == maxCount)
+
+            if (winningPath != null)
             {
-                winningPath = null;
+                System.out.println("Chosen path proposed by: " + playerNames.get(proposer));
+                finalPath = winningPath;
+                int result = handlePathSelection(winningPath);
+                return result;
             }
-        }
-        
-        if (winningPath != null)
-        {
-            finalPath = winningPath;
-            int result = handlePathSelection(winningPath);
-            return result;
-        }
-        else
-        {
-            for (int i : playersPresent)
+            else
             {
-                players.get(i).receiveResults(results);
+                for (int i : playersPresent)
+                {
+                    players.get(i).receiveResults(results);
+                }
+                return 0;
             }
-            return 0;
+        } catch (Exception ex) {
+            System.out.println("Exception in handlePathVoting!: ");
+            ex.printStackTrace();
+            System.exit(0);
         }
+
+        return 0;
     }
-    
+
     private static void getMoves()
     {
         for (int i = 0; i < num_players; i++)
@@ -459,13 +480,13 @@ public class Simulator {
                 {
                     continue;
                 }
-                
+
                 playerDestinations.set(i, dest);
                 playerRemainingTravelTimes.set(i, moveTime(loc, dest));
             }
         }
     }
-    
+
     private static int handlePathSelection(List<Point> path)
     {
         if (!path.get(path.size() - 1).equals(targetLocation))
@@ -493,12 +514,12 @@ public class Simulator {
         elapsedT += totalTime;
         return 1;
     }
-    
+
     private static boolean pointsAreAdjacent(Point p1, Point p2)
     {
         return Math.abs(p1.x - p2.x) <= 1 && Math.abs(p1.y - p2.y) <= 1;
     }
-    
+
     private static Point randomPlayerLocation()
     {
         Point location;
@@ -507,7 +528,7 @@ public class Simulator {
         } while (!playerLocationIsValid(location));
         return location;
     }
-    
+
     private static boolean playerLocationIsValid(Point loc)
     {
         if (loc.x <= 99 && loc.x >= 0 && loc.y <= 99 && loc.y >= 0)
@@ -519,30 +540,30 @@ public class Simulator {
             return false;
         }
     }
-    
+
     private static boolean playerMoveIsValid(Point move)
     {
         return Math.abs(move.x) <= 1 && Math.abs(move.y) <= 1;
     }
-    
+
     private static int moveTime(Point from, Point to)
     {
         if (from.equals(to))
         {
             return 1;
         }
-        
+
         int base = 2;
         if (from.x != to.x && from.y != to.y)
         {
             base = 3;
         }
-        
+
         boolean isMuddy = map.get(from.x).get(from.y).getC() == 1 || map.get(to.x).get(to.y).getC() == 1;
-        
+
         return isMuddy ? base * 2 : base;
     }
-    
+
     private static double dist(Point a, Point b)
     {
         return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
@@ -562,7 +583,7 @@ public class Simulator {
     // The state that is sent to the GUI. (JSON)
     private static String state(double fps) {
         String json = "{ \"refresh\":" + (1000.0/fps) + ",\"t\":" + t + ",\"elapsed\":" + elapsedT + ",\"victory\":" + victory + ",\"final_path\":";
-        
+
         if (finalPath == null)
         {
             json += "-1";
@@ -573,81 +594,81 @@ public class Simulator {
             for (int i = 0; i < finalPath.size(); i++)
             {
                 Point p = finalPath.get(i);
-                
+
                 json += "{";
-                
+
                 json += "\"x\":" + p.x + ",\"y\":" + p.y;
-                
+
                 json += "}";
-                
+
                 if (i != finalPath.size() - 1)
                 {
                     json += ",";
                 }
-                
+
             }
             json += "]";
         }
-        
+
         json += ",\"players\":[";
-        
+
         for (int i = 0; i < num_players; i++)
         {
             json += "{";
-            
+
             Point loc = playerLocations.get(i);
             json += "\"name\":\"" + playerNames.get(i) + "\",\"id\":" + i + ",\"x\":" + loc.x + ",\"y\":" + loc.y + ",\"spy\":" + (i == spyID);
-            
+
             json += "}";
             if (i != num_players - 1)
             {
                 json += ",";
             }
         }
-        
+
         json += "]";
-        
+
         json += ",\"water\":[";
-        
+
         for (int i = 0; i < waterCells.size(); i++)
         {
             json += "{";
-            
+
             Point loc = waterCells.get(i);
             json += "\"x\":" + loc.x + ",\"y\":" + loc.y;
-            
+
             json += "}";
             if (i != waterCells.size() - 1)
             {
                 json += ",";
             }
         }
-        
+
         json += "]";
-        
+
         json += ",\"mud\":[";
-        
+
         for (int i = 0; i < muddyCells.size(); i++)
         {
             json += "{";
-            
+
             Point loc = muddyCells.get(i);
             json += "\"x\":" + loc.x + ",\"y\":" + loc.y;
-            
+
             json += "}";
             if (i != muddyCells.size() - 1)
             {
                 json += ",";
             }
         }
-        
+
         json += "]";
-        
+
         json += ",\"package\": { \"x\":" + packageLocation.x + ",\"y\":" + packageLocation.y + "}";
         json += ",\"target\": { \"x\":" + targetLocation.x + ",\"y\":" + targetLocation.y + "}";
-        
+
         json += "}";
-        
+
         return json;
     }
 
@@ -750,7 +771,8 @@ public class Simulator {
                         if (++i == args.length) {
                             throw new IllegalArgumentException("Missing random seed.");
                         }
-                        spyID = Integer.parseInt(args[i]);
+
+                        spyName = args[i];
                     }
                     else if (args[i].equals("--nospy")) {
                         noSpy = true;
@@ -816,7 +838,7 @@ public class Simulator {
         Class raw_class = loader.loadClass(root + "." + name + ".Player");
         return (Player)raw_class.newInstance();
     }
-    
+
     public static MapGenerator loadMapGenerator(String name) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String sep = File.separator;
         Set<File> player_files = directory(root + sep + name, ".java");
@@ -855,7 +877,7 @@ public class Simulator {
         }
         return last_date;
     }
-    
+
     public static int getElapsedT()
     {
         return elapsedT;

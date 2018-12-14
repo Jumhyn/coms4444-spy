@@ -23,9 +23,10 @@ public class Player implements spy.sim.Player {
     private ArrayList<ArrayList<Record>> records;
     private int id;
     public Point loc;
-    private List<Point> waterCells;
-    private List<Point> clear_muddy_cells;
-    private List<Point> clearCells;
+    private Set<Point> waterCells;
+    private Set<Point> clear_muddy_cells;
+    private Set<Point> clearCells;
+    private List<Point> muddyCells;
     private List<Point> observed;
     private List<Point> notobserved;
     private List<Point> pTodPath;
@@ -47,6 +48,17 @@ public class Player implements spy.sim.Player {
     private boolean pathFound;
     private int step = 0;
     private int n;
+    private List<Point> path_to_package = null;
+    private HashMap<Point, HashMap<Integer, Integer>> receivedInfo;
+    private boolean isSpy = false;
+    private boolean verify = false;
+    private List<Point> verifyingPath;
+    private int verifyIndex = 0;
+    private boolean verified = false;
+    private boolean unverified = false;
+    private int possiblePathId = -1;
+    private int verifiedPathId = -1;
+    private int wait_at_pack = 0;
 
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -54,8 +66,11 @@ public class Player implements spy.sim.Player {
         this.loc = startingPos;
         this.destination = startingPos;
         this.records = new ArrayList<ArrayList<Record>>();
-        this.waterCells = waterCells;
-        this.clear_muddy_cells = new ArrayList<Point>();
+        this.waterCells = new HashSet<Point>();
+        for (Point p:waterCells){
+            this.waterCells.add(p);
+        }
+        this.clear_muddy_cells = new HashSet<Point>();
         this.observed = new ArrayList<Point>();
         this.notobserved = new ArrayList<Point>();
         this.move = new Point(0,0);
@@ -63,11 +78,15 @@ public class Player implements spy.sim.Player {
         this.receivedRecords = new HashMap<Integer, List<Record>>();
         this.meetSoldiers = new ArrayList<Integer>();
         this.trySoldier = -1;
-        this.clearCells = new ArrayList<Point>();
+        this.clearCells = new HashSet<Point>();
         this.rand = new Random();
         this.pTodPath = new ArrayList<Point>();
         this.currentPath = new ArrayList<Point>();
+        this.muddyCells = new ArrayList<Point>();
         this.n = n;
+        this.receivedInfo = new HashMap<Point, HashMap<Integer, Integer>>();
+        this.isSpy = isSpy;
+        this.verifyingPath = new ArrayList<Point>();
 
         this.waitTime = new HashMap<Integer,Integer>();
         for(int i=0;i<n;i++) {
@@ -159,7 +178,10 @@ public class Player implements spy.sim.Player {
 
             // record directly observed cells
             if (status.getC()!=1 && !waterCells.contains(p)) clearCells.add(p);
-            if (status.getC()==1 && !waterCells.contains(p)) clear_muddy_cells.remove(p);
+            if (status.getC()==1 && !waterCells.contains(p)) {
+                clear_muddy_cells.remove(p);
+                muddyCells.add(p);
+            }
             if (status.getPT()==1) pack = p;
             if (status.getPT()!=0 && status.getPT()!=1) dest = p;
 
@@ -177,19 +199,37 @@ public class Player implements spy.sim.Player {
     
     public List<Record> sendRecords(int id)
     {
-
-        ArrayList<Record> toSend = new ArrayList<Record>();
-        for (ArrayList<Record> row : records)
-        {
-            for (Record record : row)
+        if (isSpy == true){
+            ArrayList<Record> toSend = new ArrayList<Record>();
+            Collections.sort(muddyCells, pointComparator);
+            if(muddyCells.size()==0) return new ArrayList<Record>();
+            Point farthest_mud = muddyCells.get(muddyCells.size()-1);
+            Record muddy_record = new Record(farthest_mud, 0, 1, new ArrayList<Observation>());
+            int id_to_send;
+            if (this.id == 1)
+                id_to_send = 2;
+            else
+                id_to_send = 1;
+            muddy_record.getObservations().add(new Observation(id_to_send, Simulator.getElapsedT() - rand.nextInt(Simulator.getElapsedT())));
+            toSend.add(muddy_record);
+            System.out.println("******** SENT EVIL MUDDY RECORD **********");
+            System.out.println(toSend);
+            return toSend;
+        }
+        else{
+            ArrayList<Record> toSend = new ArrayList<Record>();
+            for (ArrayList<Record> row : records)
             {
-                if (record != null)
+                for (Record record : row)
                 {
-                    toSend.add(record);
+                    if (record != null)
+                    {
+                        toSend.add(record);
+                    }
                 }
             }
-        }
-        return toSend;
+            return toSend;
+        }        
     }
     
     public void receiveRecords(int id, List<Record> records)
@@ -204,37 +244,89 @@ public class Player implements spy.sim.Player {
         updateRecords();
     }
 
+    // public void updateRecords(){
+    //     for(int id:receivedRecords.keySet()){
+    //         List<Record> rec = receivedRecords.get(id);
+    //         for (Record r: rec){
+    //             if(!waterCells.contains(r.getLoc()) && r.getC() != 1 && notobserved.contains(r.getLoc())){
+
+    //                 clearCells.add(r.getLoc());
+    //                 keepUnique(clearCells);
+
+    //                 // trust the other agent
+    //                 observed.add(r.getLoc());
+    //                 keepUnique(observed);
+
+    //                 notobserved.remove(r.getLoc());
+    //                 keepUnique(notobserved);
+    //             }
+
+    //             // if the cell is muddy
+    //             if(!waterCells.contains(r.getLoc()) && r.getC() == 1 && notobserved.contains(r.getLoc())){
+    //                 clear_muddy_cells.add(r.getLoc());
+    //                 keepUnique(clear_muddy_cells);
+    //             }
+
+    //             // if they pass us target
+    //             if (dest == null && r.getPT() != 0 && r.getPT() != 1){
+    //                 dest = r.getLoc();
+    //             }
+
+    //             // if they pass us pakckage
+    //             if (pack == null && r.getPT() == 1){
+    //                 pack = r.getLoc();
+    //             }
+    //         }
+    //     }
+    // }
+
     public void updateRecords(){
         for(int id:receivedRecords.keySet()){
             List<Record> rec = receivedRecords.get(id);
             for (Record r: rec){
-                if(!waterCells.contains(r.getLoc()) && r.getC() != 1 && notobserved.contains(r.getLoc())){
+                Point p = r.getLoc();
+                if (!notobserved.contains(p) || waterCells.contains(p)) continue;
+                List<Observation> observe= r.getObservations();
+                int player_id = observe.get(observe.size()-1).getID();
 
-                    clearCells.add(r.getLoc());
-                    keepUnique(clearCells);
+                // package = 1, target = 2, muddy = 3, clear = 4 
+                Integer status;
+                if (r.getPT() == 1){status = new Integer(1);}
+                else if (r.getPT() != 0){status = new Integer(2);}
+                else if (r.getC()==1){status = new Integer(3);}
+                else{status = new Integer(4);}
 
-                    // trust the other agent
-                    observed.add(r.getLoc());
-                    keepUnique(observed);
-
-                    notobserved.remove(r.getLoc());
-                    keepUnique(notobserved);
+                if(!receivedInfo.containsKey(p)){
+                    HashMap<Integer,Integer> record = new HashMap<>();
+                    record.put(status,player_id);
+                    receivedInfo.put(p,record);
                 }
-
-                // if the cell is muddy
-                if(!waterCells.contains(r.getLoc()) && r.getC() == 1 && notobserved.contains(r.getLoc())){
-                    clear_muddy_cells.add(r.getLoc());
-                    keepUnique(clear_muddy_cells);
-                }
-
-                // if they pass us target
-                if (dest == null && r.getPT() != 0 && r.getPT() != 1){
-                    dest = r.getLoc();
-                }
-
-                // if they pass us pakckage
-                if (pack == null && r.getPT() == 1){
-                    pack = r.getLoc();
+                else{
+                    HashMap<Integer,Integer> record = receivedInfo.get(p);
+                    if (record.containsKey(status)){
+                        if(record.get(status)!=player_id){
+                            //System.out.println("Trusting Player "+player_id);
+                            observed.add(p);
+                            notobserved.remove(p);
+                            if(status==1){
+                                pack = p;
+                                clearCells.add(p);
+                            }
+                            else if (status==2){
+                                dest = p;
+                                clearCells.add(p);
+                            }
+                            else if (status==3){
+                                clear_muddy_cells.add(p);
+                            }
+                            else{
+                                clearCells.add(p);
+                            }
+                        }
+                    }
+                    else{
+                        record.put(status,player_id);
+                    }
                 }
             }
         }
@@ -251,8 +343,11 @@ public class Player implements spy.sim.Player {
     public List<Point> proposePath()
     {
         if (pack == null || dest == null) return null;
- 
-        return BFS(pack,dest);
+        
+        if (isSpy)
+            return BFS_Naive(pack, dest);
+        else
+            return BFS(pack, dest);
     }
 
     // BFS to take only non-muddy path
@@ -424,14 +519,52 @@ public class Player implements spy.sim.Player {
     
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        System.out.println("---------"+this.id+" Voting-----------");
+        ArrayList<Integer> toReturn = new ArrayList<Integer>();
+        if(verifiedPathId>0) {
+            toReturn.add(verifiedPathId);
+            verified = false;
+            unverified = false;
+        }
+        for (Map.Entry<Integer, List<Point>> entry : paths.entrySet()) {
+            if (entry.getKey() == this.id) {
+                toReturn.add(entry.getKey()); // always accept our path
+            }
+        }
+
+        if (isSpy == true)
+            return toReturn;
+
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
         {
-            ArrayList<Integer> toReturn = new ArrayList<Integer>();
-            toReturn.add(entry.getKey());
-            //return entry.getKey();
-            return toReturn;                                    // maybe change something here to make sure we output path? MAYBE
+            List<Point> potential = entry.getValue();
+            boolean looksGood = true;
+            boolean verifyPotential = true;
+            for (int i=0;i<potential.size();i++) {
+                if (!clearCells.contains(potential.get(i))) {
+                    looksGood = false;
+                }
+                if (muddyCells.contains(potential.get(i)) || waterCells.contains(potential.get(i))) {
+                    verifyPotential = false; // as soon as encounter a muddy cell
+                } 
+            }
+            if (looksGood) {
+                toReturn.add(entry.getKey());                  
+            }   
+            else if (verifyPotential) {
+                verifyingPath = potential;
+                verify = true;
+                possiblePathId = entry.getKey();
+            }                  
         }
-        return null;
+        for(Integer i:toReturn){
+            System.out.print(i);
+        }
+        System.out.println();
+        Collections.sort(toReturn);
+        List<Integer> returnID = new ArrayList<>();
+        returnID.add(toReturn.get(0));
+        return returnID;  
     }
     
     public void receiveResults(HashMap<Integer, Integer> results)
@@ -587,6 +720,44 @@ public class Player implements spy.sim.Player {
             }
         }
 
+        // VERIFYING PATH STUFF
+        if (verify == true) { // we are verifying a path
+            System.out.println("VERIFYING");
+            //verify index = 0 at beginning
+            Point pathPt = verifyingPath.get(verifyIndex);
+            //make sure pathPt is a clear cell, if not return to package
+            if (pathPt == dest ) {
+                verified = true;
+                verifiedPathId = possiblePathId;
+                verify = false;
+                verifyIndex = 0;
+            }
+            else if (clearCells.contains(pathPt)) {
+                loc = new Point(pathPt);
+                verifyIndex ++;
+                return new Point(pathPt.x - loc.x, pathPt.y - loc.y);
+            }
+            else { // they liedddddd
+                //return to package
+                unverified = true;
+                verify = false;
+                verifyIndex = 0;
+                possiblePathId = -1;
+            }
+
+        }
+
+        if (verified == true || unverified == true) { // we finished verifying a path
+            System.out.println("FINISHED VERIFYING");
+            path_to_package = BFS_not_muddy(loc, pack);
+            Point toPackage = path_to_package.get(0);
+            path_to_package.remove(0);
+            move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+            loc = new Point(toPackage.x, toPackage.y);
+            System.out.println(this.id + " is moving to " + move.x + "," + move.y);
+            return move;
+        }
+
         //whatISee(neighbors);
         if (pathFound){
             step +=1;
@@ -594,8 +765,9 @@ public class Player implements spy.sim.Player {
 
         // once target and packet both found, move to packet
         if (pack != null && dest != null){
+            pathFound = true;
             // if we are at package, and we have found both package and target. MOVE BETWEEN PACKAGE AND TARGET
-            if (loc.x==pack.x && loc.y==pack.y){
+            if (loc.x==pack.x && loc.y==pack.y && wait_at_pack<=500){
 
                 // even at package, when both players together, reset wait time to help run simulator fast
                 /*for(int id:waitTime.keySet()){
@@ -611,23 +783,58 @@ public class Player implements spy.sim.Player {
                 // if (pathFound){
                 //     return new Point(0, 0);
                 // }
-
+                wait_at_pack += 1;
+                if (wait_at_pack > 500){
+                    step = 0;
+                }
                 return new Point(0, 0);
             }
-
-
-            // move back and forth between package and target
-            List<Point> path = BFS_not_muddy(loc, pack);
-            if (path == null){
-                System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+            else{
+                wait_at_pack = 0;
             }
-            path.remove(0);
-            Point toPackage = path.get(0);
-            move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
-            loc = new Point(toPackage.x, toPackage.y);
-            System.out.println(this.id + " is moving to " + move.x + "," + move.y);
-            return move;
 
+            if (step > 200){            
+                if (path_to_package == null ||path_to_package.size() == 0){
+                    path_to_package = new ArrayList<Point>();
+                    path_to_package = BFS_not_muddy(loc, pack);
+                    System.out.println("loc:"+loc.x+","+loc.y+";");
+                    // lol somebody cheated us and so we could not find proper path. Alas we need to find pack and dest again :/
+                    if (path_to_package == null){
+                        pack = null;
+                        dest = null;
+                        pathFound = false;
+                    }
+                    else{
+                        for(Point i:path_to_package){
+                            System.out.print(i.x+","+i.y+";");
+                        }
+                        System.out.println();
+                        path_to_package.remove(0);
+                        Point toPackage = path_to_package.remove(0);
+                        return new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+                    }
+                }
+                else{
+
+                    // Point destination = path_to_package.remove(0);
+                    // return new Point(destination.x-loc.x,destination.y-loc.y);
+
+                    // if (path_to_package.size() == 0){
+                    //     path_to_package = null;
+                    // }
+                    
+                    // if (path_to_package == null){
+                    //     System.out.println("JUST SHOULD NOT HAPPEN. DUMB PLAYER!!");
+                    //     return new Point(0, 0);
+                    // }
+
+     
+                    //path_to_package.remove(0);
+                    Point toPackage = path_to_package.remove(0);
+                    move = new Point(toPackage.x-loc.x, toPackage.y-loc.y);
+                    return move;
+                }
+            }
 
 
             // if (pTodPath.size()==0){
@@ -730,7 +937,9 @@ public class Player implements spy.sim.Player {
                     return new Point(0, 0);
                 }
                 else {
-                    return new Point (destination.x - loc.x, destination.y - loc.y);
+                    move = new Point(destination.x - loc.x, destination.y - loc.y);
+                    loc = new Point(destination.x, destination.y);
+                    return move;
                 }
             }
             else {//if (destination.x!=loc.x || destination.y!=loc.y){
@@ -776,8 +985,12 @@ public class Player implements spy.sim.Player {
         if (pack!=null || dest!=null){
             Collections.sort(notobserved, pointComparator);     // find nearesr unseen point
             int total_unobserved = Math.min(notobserved.size(), 5);     // to have some randomness in player
-            destination = notobserved.get(rand.nextInt(total_unobserved));
-
+            if (total_unobserved == 0){
+                destination=observed.get(rand.nextInt(observed.size()-1));
+            }
+            else{
+                destination = notobserved.get(rand.nextInt(total_unobserved));
+            }
             //System.out.println("Destination chosen: " + destination);
             List<Point> path = BFS_not_muddy(loc, destination);
 
@@ -800,8 +1013,6 @@ public class Player implements spy.sim.Player {
             Point dest = currentPath.remove(0);
             return new Point(dest.x-loc.x,dest.y-loc.y);
         }
-
-
 
         //System.out.println("curr n_obs size: "+notobserved.size());
 
@@ -840,6 +1051,7 @@ public class Player implements spy.sim.Player {
         else { // when we have finished observing, should not be called 
             int x = rand.nextInt(2) * 2 - 1;
             int y = rand.nextInt(2 + Math.abs(x)) * (2 - Math.abs(x)) - 1;
+            loc = new Point(loc.x + x, loc.y + y);
             move = new Point(x, y);
         }
 

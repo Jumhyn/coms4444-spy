@@ -65,13 +65,25 @@ public class Player implements spy.sim.Player {
     private int minGraceTime = 25; // Minimum count needed to allow communication protocol
     private Boolean send_rec;
 
+    // Handle Information Fusion
+    // Each cell has a corresponding list of records which respecitve dry/muddy claims
+    // To access a list of records of position (x, y)
+    // Simply Index into the desired records with dryRecords.get(x).get(y)
+    // This returns a list of records for that cell
+    private ArrayList<ArrayList<ArrayList<Integer>>> dryRecords;
+    private ArrayList<ArrayList<ArrayList<Integer>>> mudRecords; 
+    private double[][] dryConfidence;
+    private double[][] mudConfidence;
+     private int[][] prob_grid;
+    private int num_players;
+
     private int sendCount = 0;
     private int recCount = 0;
      
     private ArrayList<Point> wayPoints;
+    private List<Point> fakePath; // proposed safe path from package to target
+    private Boolean isSpy;
 
-    private ArrayList<ArrayList<Record>> landInfo; // similar to 'records' but global for dry land claims
-    private ArrayList<ArrayList<Record>> mudInfo; // similar to 'records' but global for muddy land claims
     
     public void init(int n, int id, int t, Point startingPos, List<Point> waterCells, boolean isSpy)
     {
@@ -88,6 +100,9 @@ public class Player implements spy.sim.Player {
         this.trap_count =  new HashMap<Point,Integer>();
         this.time =0;
         this.unexplored = getRandomUnexplored();
+        this.num_players = n;
+        this.isSpy = isSpy;
+        this.fakePath = new ArrayList<Point>();
 
         this.wayPoints = new ArrayList<Point>();
 
@@ -131,6 +146,30 @@ public class Player implements spy.sim.Player {
         // System.out.println(row);
             this.records.add(row);
         }
+
+
+
+         // Initialize dry/mud records 
+        // this.dryRecords = new ArrayList<ArrayList<ArrayList<Record>>>();
+        // this.mudRecords = new ArrayList<ArrayList<ArrayList<Record>>>();
+
+        // for (int i = 0; i < 100; i++)
+        // {
+        //     ArrayList<ArrayList<Record>> dryRow = new ArrayList<ArrayList<Record>>();
+        //     ArrayList<ArrayList<Record>> mudRow = new ArrayList<ArrayList<Record>>();
+        //     for (int j = 0; j < 100; j++)
+        //     {
+        //         ArrayList<Record> dryColumn = new ArrayList<Record>();
+        //         ArrayList<Record> mudColumn = new ArrayList<Record>();
+
+        //         dryRow.add(dryColumn);
+        //         mudRow.add(mudColumn);
+        //     }
+        //     this.dryRecords.add(dryRow);
+        //     this.mudRecords.add(mudRow);
+        // }
+
+
     }
     
     //Observes the vicinity, upfates grid & visited for all visible cells
@@ -217,8 +256,81 @@ public class Player implements spy.sim.Player {
             
 
         }
+
+
+        if (!this.isSpy)
+        {
+            return toSend;
+        }
+        else
+        {
+            return toSend.subList(Math.max(0, toSend.size() - 49), toSend.size());
+        }
         
-        return toSend;
+    }
+
+    // private Boolean independent_concur(ArrayList<ArrayList<ArrayList<Integer>>> log, Point p)
+    // {
+    //     int x = p.x;
+    //     int y = p.y;
+
+    //     if(log.get(x).get(y).size()<2) return false;
+
+    //     int[] count = new int[num_players];
+
+    //     for(int i =0;i<num_players;i++)
+    //     {
+
+    //     } 
+    // }
+
+    private void update_prob_obs(Record rec)
+    {
+
+        // ArrayList<Observation> obs = rec.getObservations();
+        // int c = rec.getC();
+        // int pt = rec.getPT();
+        // Point p = rec.getLoc();
+        // Boolean repeat = false;
+        // int i = 0;
+
+        // if(obs.size()>num_players)
+        //     {
+        //         repeat = true;
+        //         i = num_players - 1;
+        //     }
+
+        // ArrayList<Integer> obsList = new ArrayList<Integer>();
+        //     while(i<obs.size())
+        //     {
+        //         obsList.add(obs.get(i).getID());
+        //     }
+
+        // if(c == 0)
+        // {
+        //     dryRecords.get(p.x).get(p.y).add(obsList);
+        // }
+
+        // else if (c==1)
+        // {
+        //      mudRecords.get(p.x).get(p.y).add(obsList);
+        // }
+
+
+        // if( dryRecords.get(p.x).get(p.y).size() >=2 && independent_concur(dryRecords,p))
+        // {
+        //     // reliable info: still don't trust for final path as a precaution, to handle unintentional spies i.e. bugs
+
+        //     visited[p.x][p.y] = 1;
+        //     prob_grid[p.x][p.y] = 0;
+
+        // }
+
+        // else if (mudRecords.get(p.x).get(p.y).size() >=2 && independent_concur(mudRecords,p))
+        // {
+        //     visited[p.x][p.y] = 1;
+        //     prob_grid[p.x][p.y] = -1;
+        // }
     }
     
     // receives records and updates grid &  visited according ro info provided.
@@ -279,21 +391,111 @@ public class Player implements spy.sim.Player {
     //Proposes the path if on package location
     public List<Point> proposePath()
     {
-        if(proposedPath.size()>1)
+        if(proposedPath.size()>1 && !isSpy)
             return proposedPath;
+        else if (proposedPath.size()>1 && isSpy)
+            return fakePath;
+
         return null;
+    }
+
+     private boolean pointsAreAdjacent(Point p1, Point p2)
+    {
+        return Math.abs(p1.x - p2.x) <= 1 && Math.abs(p1.y - p2.y) <= 1;
+    }
+
+    private int moveTime(Point from, Point to)
+    {
+        if (from.equals(to))
+        {
+            return 1;
+        }
+        
+        int base = 2;
+        if (from.x != to.x && from.y != to.y)
+        {
+            base = 3;
+        }
+        
+        boolean isMuddy = grid[from.x][from.y] == -1 || grid[to.x][to.y] == -1;
+        
+        return isMuddy ? base * 2 : base;
+    }
+
+    private int valid_path(List<Point> path)
+    {
+        if(!_package || !_target) 
+            {
+                 System.out.println("couldn't locate package or target");
+                return -1;
+            }
+
+        if(path.size()<2 || path.size()>3000) 
+            {
+                 System.out.println("path is fishy");
+                return -1;
+            }
+
+        if(!(path.get(0).equals(package_Location) && path.get(path.size()-1).equals(target_Location)))
+        {
+            System.out.println("path not from package to target");
+            return -1;
+        } 
+
+        int totalTime = 0;
+
+        for (int i = 1; i < path.size(); i++)
+        {
+            Point from = path.get(i - 1);
+            Point to = path.get(i);
+            if (!pointsAreAdjacent(from, to))
+            {
+                return -1;
+            }
+            int cell_status = grid[to.x][to.y];
+            if (cell_status < 0)
+            {
+                return -1;
+            }
+            totalTime += moveTime(from, to) * 5;
+        }
+
+        return totalTime;
+
     }
     
     // Vote for proposed paths
     //NOTE: Currently trusting all paths proposed by the players. Assuming the correctness of their implementations
     public List<Integer> getVotes(HashMap<Integer, List<Point>> paths)
     {
+        ArrayList<Integer> toReturn = new ArrayList<Integer>();
+        int min_time = Integer.MAX_VALUE;
+        int vote_id = -1;
+
         for (Map.Entry<Integer, List<Point>> entry : paths.entrySet())
         {
-            ArrayList<Integer> toReturn = new ArrayList<Integer>();
-            toReturn.add(entry.getKey());
+            int tot_time = valid_path(entry.getValue());
+            if(entry.getKey()==id && isSpy)
+            {
+                toReturn.add(id);
+                return toReturn;
+            }
+            if(tot_time>0 && tot_time<min_time)
+            {
+                min_time = tot_time;
+                System.out.println("voting for correct path");
+                vote_id = entry.getKey();
+            }
+            
+        }
+
+        if(vote_id>=0)
+        {
+            toReturn.add(vote_id);
             return toReturn;
         }
+        
+
         return null;
     }
     
@@ -370,6 +572,7 @@ public class Player implements spy.sim.Player {
             }
         }
 
+        System.out.println("no point left to explore");
         return new Point(-1000,-1000);
     }
 
@@ -471,6 +674,11 @@ public class Player implements spy.sim.Player {
             }
 
             System.out.println("next move point is "  + prev);
+
+            if(prev.x<0)
+            {
+                System.out.println("no path found from  " + loc + " " + destination);
+            }
             return prev;
 
 
@@ -633,6 +841,16 @@ public class Player implements spy.sim.Player {
                         System.out.println(proposedPath.get(i));
                     }
                }
+
+
+            if (isSpy && found_path)
+            {
+                for(int i=0;i<proposedPath.size();i++)
+                {
+                    for(int j=0;j<100;j++)
+                        fakePath.add(proposedPath.get(i));
+                }
+            }
         }
             
         }
@@ -651,14 +869,14 @@ public class Player implements spy.sim.Player {
         int x  = move.x - loc.x;
         int y = move.y - loc.y;
 
-        
+        if(x>=-1 && y>=-1)
         return new Point(x,y);
     }
     //
     //If safe path has been found from package to target and you are package location, then wait and announce proposed path.
     //Also vote for appropriate paths
     //
-    else if(_target && _package && found_path)
+    else if(_target && _package && found_path && loc.equals(package_Location))
     {
         return new Point(0,0);
     }
@@ -692,24 +910,27 @@ public class Player implements spy.sim.Player {
     //
     // maintain a trap count for current location
     //
-    if(trap_count.containsKey(next))
+    if(trap_count.containsKey(loc))
     {
-        trap_count.put(next,trap_count.get(next)+1);
+        trap_count.put(loc,trap_count.get(loc)+1);
     }
     else
     {
-        trap_count.put(next,0);
+        trap_count.put(loc,0);
     }
     //
     //if you have visited the same site more than 10 times, then probably trapped. Select a random unexplored cell and proceed towards that to break free.
     //
-    if(trap_count.get(next)<10)
+    if(trap_count.get(loc)<10)
     {
         move = next;
         int x  = move.x - loc.x;
         int y = move.y - loc.y;
          if(x>=-1 && y>=-1)
+           {
+             trap_count.put(loc,0);
             return new Point(x,y);
+           } 
     }
     else
     {
@@ -719,13 +940,18 @@ public class Player implements spy.sim.Player {
             int y = move.y - loc.y;
 
             if(x>=-1 && y>=-1)
-            return new Point(x,y);
+            {
+                return new Point(x,y);
+            }
+
+            System.out.println("escape routine failed!");
 
     }
 
         //
         //This basically should never happem. It implies that you visited all possible cells and still found no valid path!
         //
+        System.out.println("reached safety check. should not happen");
         return move;
     }
 }

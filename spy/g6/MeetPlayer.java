@@ -26,10 +26,11 @@ public class MeetPlayer extends MovementTask {
         waterSet.addAll(waterCells);
         this.moves = new LinkedList<>();
         this.targetLoc = targetLoc;
-        if(targetPlayerID != myPlayerID){
-            updateMoves();
+        if (targetPlayerID != myPlayerID) {
+            if(!updateMoves()) abort = true;
+        } else {
+            abort = true;
         }
-        System.out.println("meetplayer");
     }
 
     private boolean inMap(Point p) {
@@ -82,7 +83,7 @@ public class MeetPlayer extends MovementTask {
         return ret;
     }
 
-    private List<Point> getMoves(Point cur, List<Point> availableCells) {
+    private List<Point> getMoves(Point cur, Set<Point> availableCells) {
         ArrayList<Point> ret = new ArrayList<>();
         Point[] candidates = {
                 new Point(cur.x - 1, cur.y),
@@ -107,16 +108,20 @@ public class MeetPlayer extends MovementTask {
         //bfs
         Queue<Point> q = new LinkedList<>();
         Map<Point, Point> parent = new HashMap<>();
+        Set<Point> cutset = new HashSet<>();
+        cutset.addAll(availableCells);
         List<Point> ret = new ArrayList<>();
         q.add(myPlayerLoc);
+        cutset.remove(myPlayerLoc);
         parent.put(myPlayerLoc, myPlayerLoc);
         while (!q.isEmpty()) {
             Point cur = q.poll();
+            cutset.remove(cur);
             if (cur.equals(targetLoc)) {
                 break;
             }
-            List<Point> availableMoves = getMoves(cur, availableCells);
-            if (availableMoves == null || availableMoves.isEmpty()) return null;
+            List<Point> availableMoves = getMoves(cur, cutset);
+            if (availableMoves == null || availableMoves.isEmpty()) continue;
             for (Point p : availableMoves) {
                 q.add(p);
                 parent.put(p, cur);
@@ -127,6 +132,7 @@ public class MeetPlayer extends MovementTask {
         while (!itr.equals(myPlayerLoc)) {
             stk.push(itr);
             itr = parent.get(itr);
+            if(itr == null) return null;
         }
         stk.push(myPlayerLoc);
         while (!stk.isEmpty()) {
@@ -148,6 +154,7 @@ public class MeetPlayer extends MovementTask {
     @Override
     public boolean isCompleted() {
         // TODO
+        if (abort) return true;
         if (moves.isEmpty()) {
             return true;
         }
@@ -157,7 +164,7 @@ public class MeetPlayer extends MovementTask {
     @Override
     public Point nextMove() {
         if (moves.isEmpty()) {
-           return null;
+            return null;
         } else return super.nextMove();
     }
 
@@ -170,8 +177,10 @@ public class MeetPlayer extends MovementTask {
         if (roundCount > EXPIRATION) return false;
         if (myPlayerID < targetPlayerID) {
             moves.clear();
-            moves.add(new Point(0, 0));
-            System.out.println(myPlayerID + " wait " + targetPlayerID);
+            for (int i = 0; i < 10; i++) {
+                moves.add(new Point(0, 0));
+            }
+//            System.out.println(myPlayerID + " wait " + targetPlayerID);
             roundCount++;
             return true;
         }
@@ -179,7 +188,7 @@ public class MeetPlayer extends MovementTask {
     }
 
     private boolean updateMoves() {
-        if(targetLoc.equals(myPlayerLoc)) {
+        if (targetLoc.equals(myPlayerLoc)) {
             moves.clear();
             return false;
         }
@@ -187,15 +196,22 @@ public class MeetPlayer extends MovementTask {
         if (!shouldMeet()) return false;
         if (shouldWait()) return true;
         else {
-            List<Point> myObs = withinObservationRadius(myPlayerLoc);
-            if (myObs == null) return false;
-            List<Point> targetObs = withinObservationRadius(targetLoc);
-            List<Point> intersectionCells = intersectionOfPoints(myObs, targetObs);
-            List<Point> availableCells = filterToAvailablePoints(intersectionCells);
-            List<Point> path = findPath(availableCells);
-            if (path == null) return false;
-            moves.clear();
-            moves.addAll(deltaFromPath(path));
+            try {
+                List<Point> myObs = withinObservationRadius(myPlayerLoc);
+                if (myObs == null) return false;
+                List<Point> targetObs = withinObservationRadius(targetLoc);
+                List<Point> intersectionCells = intersectionOfPoints(myObs, targetObs);
+                List<Point> availableCells = filterToAvailablePoints(intersectionCells);
+                List<Point> path = findPath(availableCells);
+                if (path == null) return false;
+                moves.clear();
+                moves.addAll(deltaFromPath(path));
+            }
+            catch (Exception e){
+                System.out.println(e.getMessage());
+            }
+
+            // System.out.println("deltaFromPath");
         }
         return true;
     }
